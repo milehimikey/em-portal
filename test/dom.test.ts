@@ -63,7 +63,26 @@ describe("generated pages (DOM)", () => {
     const rows = doc.querySelectorAll("table tbody tr");
     expect(rows.length).toBeGreaterThan(0);
     const firstRowCells = rows[0].querySelectorAll("td");
-    expect(firstRowCells.length).toBe(3);
+    expect(firstRowCells.length).toBe(4);
+  });
+
+  it("slice page: every element row carries a stable ref id addressable by fragment (MIL-173)", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "checkout.html"), "utf8");
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const rows = doc.querySelectorAll("table tbody tr[id]");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of Array.from(rows)) {
+      const id = row.getAttribute("id")!;
+      // em export ref shape: <sliceKey>/<kind>.<slug>
+      expect(id).toMatch(/^checkout\/[a-z]+\.[a-z0-9-]+$/);
+      // A same-page fragment link exists pointing right back at this id.
+      // (Attribute-value selector, not an ID selector, so no CSS.escape is
+      // needed even though `id` itself contains "/" and "." — jsdom doesn't
+      // ship CSS.escape.)
+      const permalink = doc.querySelector(`a[href="#${id}"]`);
+      expect(permalink).toBeTruthy();
+    }
   });
 
   it("slice page: breadcrumbs link back up to the model and the site root", async () => {

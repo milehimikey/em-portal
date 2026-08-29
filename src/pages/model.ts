@@ -5,6 +5,11 @@
 
 import { escapeHtml, layout } from "./html.js";
 import { SlicePattern } from "../em/exportDoc.js";
+// Note: this page's slice links are relative to the model directory itself
+// ("slices/<key>.html"), not the site-root-relative form src/refs.ts's
+// sliceUrl() returns (which is for cross-page links, e.g. the landing
+// page's cross-model-links table) — so this page builds its own hrefs
+// rather than reusing that helper.
 
 const PATTERN_LABEL: Record<SlicePattern, string> = {
   "state-change": "State Change",

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Per-slice page: this slice's own diagram, its rendered doc, driftSignal,
 // and a link to wherever it was implemented (MIL-172's scope: "diagram,
-// rendered doc, driftSignal, PR link"). MIL-173 (a follow-up PR) adds
-// per-element deep-link anchors built on `em export`'s own stable `ref`s.
+// rendered doc, driftSignal, PR link"). MIL-173: every element row also
+// carries its own `em export` ref as a DOM id plus a visible, copyable
+// deep-link permalink (src/refs.ts) — the URL scheme an agent's `em query`/
+// MCP citation and a stakeholder's portal link share.
 
 import { escapeHtml, layout } from "./html.js";
 import { EmElement, EmSlice, SliceDocJoin, SlicePattern } from "../em/exportDoc.js";
+import { elementDeepLink } from "../refs.js";
 
 const PATTERN_LABEL: Record<SlicePattern, string> = {
   "state-change": "State Change",
@@ -57,22 +60,30 @@ function elementDetail(el: EmElement): string {
   return parts.map(escapeHtml).join(" &middot; ");
 }
 
-function renderElementsTable(elements: EmElement[]): string {
+function renderElementsTable(elements: EmElement[], modelKey: string): string {
   const rows = elements
     .map((el) => {
       const annotations: string[] = [];
       if (el.issue) annotations.push(`<div><span class="badge warn">issue</span> ${escapeHtml(el.issue)}</div>`);
       if (el.divergence) annotations.push(`<div><span class="badge">divergence</span> ${escapeHtml(el.divergence)}</div>`);
-      return `      <tr>
+      // The fragment jump target for THIS page is always local ("#<ref>") — a
+      // relative deep link never needs the "<model-key>/slices/<key>.html"
+      // prefix when it's already pointing at the page it's sitting on. The
+      // full portable citation (what elementDeepLink returns) is shown as
+      // the visible, copyable permalink text instead, so a reader can grab
+      // the whole address without leaving the page.
+      const deepLink = elementDeepLink(modelKey, el.ref);
+      return `      <tr id="${escapeHtml(el.ref)}">
         <td>${escapeHtml(el.kind)}</td>
         <td>${escapeHtml(el.name)}</td>
         <td>${elementDetail(el)}${annotations.join("")}</td>
+        <td class="permalink"><a href="#${escapeHtml(el.ref)}" title="Deep link: ${escapeHtml(deepLink)}">#${escapeHtml(el.ref)}</a></td>
       </tr>`;
     })
     .join("\n");
 
   return `    <table>
-      <thead><tr><th>Kind</th><th>Name</th><th>Detail</th></tr></thead>
+      <thead><tr><th>Kind</th><th>Name</th><th>Detail</th><th>Ref</th></tr></thead>
       <tbody>
 ${rows}
       </tbody>
@@ -110,7 +121,7 @@ export function renderSlicePage(args: SlicePageArgs): string {
     </div>
     <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(sliceDiagramFile)}"></object></div>
     <p class="full-diagram-link"><a href="${escapeHtml(diagramFile)}">View full model diagram &rarr;</a></p>
-${renderElementsTable(slice.elements)}
+${renderElementsTable(slice.elements, args.modelKey)}
 ${docSection}`;
 
   return layout(`${slice.name} — ${modelName}`, body, "../../index.html", [

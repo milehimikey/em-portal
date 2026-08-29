@@ -18,6 +18,8 @@ const FIXTURES = join(__dirname, "fixtures");
 const ORDER_FULFILLMENT = join(FIXTURES, "order-fulfillment", "order-fulfillment.em");
 const CHECKOUT = join(FIXTURES, "multi-model", "models", "checkout", "checkout.em");
 const FULFILLMENT = join(FIXTURES, "multi-model", "models", "fulfillment", "fulfillment.em");
+const PRODUCER = join(FIXTURES, "cross-model", "producer", "producer.em");
+const CONSUMER = join(FIXTURES, "cross-model", "consumer", "consumer.em");
 
 describe("buildPortal", () => {
   let outDir: string;
@@ -95,5 +97,45 @@ describe("buildPortal", () => {
   it("refuses with a clear error when a model fails to compile", async () => {
     const badFile = join(FIXTURES, "invalid", "broken.em");
     await expect(buildPortal([badFile], { outDir: join(outDir, "should-not-exist") })).rejects.toThrow();
+  });
+
+  it("gives every element row a stable ref id, matching src/refs.ts's parseElementRef shape", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "checkout.html"), "utf8");
+    // em export ref shape: <sliceKey>/<kind>.<slug>
+    expect(html).toMatch(/id="checkout\/command\.[a-z0-9-]+"/);
+    // The visible permalink cites the same ref as its link text.
+    expect(html).toMatch(/href="#checkout\/command\.[a-z0-9-]+"/);
+  });
+});
+
+describe("buildPortal — cross-model deep links (MIL-173)", () => {
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await mkdtemp(join(tmpdir(), "em-portal-cross-model-test-"));
+    await buildPortal([PRODUCER, CONSUMER], { outDir, title: "Cross-model test" });
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  it("resolves the producer's public event against the consumer's matching element names", async () => {
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain("Cross-model links");
+    expect(html).toContain("Signal Emitted");
+  });
+
+  it("links each side of a cross-model link straight to the specific element, not just the model page", async () => {
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain('href="producer/slices/emit-signal.html#emit-signal/event.signal-emitted"');
+    expect(html).toContain('href="consumer/slices/react-to-signal.html#react-to-signal/command.handle-signal-emitted"');
+  });
+
+  it("every deep link on the landing page resolves to a real anchor id on its target page", async () => {
+    const producerSlice = await readFile(join(outDir, "producer", "slices", "emit-signal.html"), "utf8");
+    expect(producerSlice).toContain('id="emit-signal/event.signal-emitted"');
+    const consumerSlice = await readFile(join(outDir, "consumer", "slices", "react-to-signal.html"), "utf8");
+    expect(consumerSlice).toContain('id="react-to-signal/command.handle-signal-emitted"');
   });
 });

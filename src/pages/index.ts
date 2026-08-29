@@ -8,6 +8,7 @@
 import { escapeHtml, layout } from "./html.js";
 import { StatusDoc } from "../em/statusDoc.js";
 import { PortalSummary } from "./types.js";
+import { elementDeepLink } from "../refs.js";
 
 function pct(numer: number, denom: number): string {
   if (denom === 0) return "n/a";
@@ -96,13 +97,20 @@ export function renderIndexPage(status: StatusDoc, summary: PortalSummary): stri
     .join("\n");
 
   const linkRows = summary.crossModelLinks
-    .map(
-      (l) => `      <tr>
+    .map((l) => {
+      // MIL-173: both ends of a cross-model link resolve straight to the
+      // specific publishing/referencing ELEMENT via the same deep-link
+      // scheme a slice page's own permalinks use — not just the model's
+      // landing page — since the whole point of surfacing this row is "here
+      // is exactly which element on each side."
+      const fromLink = elementDeepLink(l.fromModelKey, l.fromRef);
+      const toLink = elementDeepLink(l.toModelKey, l.toElementRef);
+      return `      <tr>
         <td><code>${escapeHtml(l.eventName)}</code></td>
-        <td><a href="${escapeHtml(l.fromModelKey)}/index.html">${escapeHtml(l.fromModelKey)}</a></td>
-        <td><a href="${escapeHtml(l.toModelKey)}/index.html">${escapeHtml(l.toModelKey)}</a></td>
-      </tr>`,
-    )
+        <td><a href="${escapeHtml(fromLink)}">${escapeHtml(l.fromModelKey)}</a></td>
+        <td><a href="${escapeHtml(toLink)}">${escapeHtml(l.toModelKey)}</a></td>
+      </tr>`;
+    })
     .join("\n");
 
   const crossModelSection =
@@ -110,7 +118,8 @@ export function renderIndexPage(status: StatusDoc, summary: PortalSummary): stri
       ? `    <h2>Cross-model links</h2>
     <p>Resolved by matching a <code>public</code> event's name against every other model's
     element names — a naming-convention join, not a compiler-verified reference (see
-    the em-portal README's "Cross-model navigation" section).</p>
+    the em-portal README's "Cross-model navigation" section). Each link goes straight to the
+    specific element on either side, not just that model's landing page.</p>
     <table>
       <thead><tr><th>Public event</th><th>Published by</th><th>Referenced by</th></tr></thead>
       <tbody>
