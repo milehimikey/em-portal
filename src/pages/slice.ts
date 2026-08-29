@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Per-slice page: this slice's own diagram, its rendered doc, driftSignal,
 // and a link to wherever it was implemented (MIL-172's scope: "diagram,
-// rendered doc, driftSignal, PR link"). MIL-173 (a follow-up PR) adds
-// per-element deep-link anchors built on `em export`'s own stable `ref`s.
+// rendered doc, driftSignal, PR link"). MIL-173: every element row also
+// carries its own `em export` ref as a DOM id plus a visible, copyable
+// deep-link permalink (src/refs.ts) — the URL scheme an agent's `em query`/
+// MCP citation and a stakeholder's portal link share.
 
 import { escapeHtml, layout } from "./html.js";
 import { EmElement, EmSlice, SliceDocJoin, SlicePattern } from "../em/exportDoc.js";
+import { elementDeepLink } from "../refs.js";
 
 const PATTERN_LABEL: Record<SlicePattern, string> = {
   "state-change": "State Change",
@@ -40,6 +43,35 @@ function implementedInHtml(implementedIn: string | null): string {
   return `<code>${escapeHtml(implementedIn)}</code>`;
 }
 
+/** `ratifiedBy`/`ratifiedOn` (schema 1.8, MIL-165) — who signed off on this
+ *  doc's current status/version, and when. Both are hand-filled and often
+ *  absent even on an `implemented` doc predating the feature (or ratified by
+ *  hand before it existed) — that's routine, not a gap, so it renders as a
+ *  plain "not recorded" note rather than a warning badge. */
+function ratifiedByHtml(ratifiedBy: string | null, ratifiedOn: string | null): string {
+  if (!ratifiedBy) return `<span class="no-doc">not recorded</span>`;
+  return ratifiedOn ? `${escapeHtml(ratifiedBy)} <span class="pattern">(${escapeHtml(ratifiedOn)})</span>` : escapeHtml(ratifiedBy);
+}
+
+/** `owner`/`tracking` (schema 1.9, MIL-171) — rendered as one optional line
+ *  beneath the stat row, omitted entirely when neither is set (same
+ *  "nothing to report" convention `em status`'s own text report uses for
+ *  its doc-issues line), rather than two more always-present "not set"
+ *  tiles cluttering the common case. */
+function ownerTrackingHtml(owner: string | null, tracking: string | null): string {
+  if (!owner && !tracking) return "";
+  const parts: string[] = [];
+  if (owner) parts.push(`Owner: <strong>${escapeHtml(owner)}</strong>`);
+  if (tracking) {
+    parts.push(
+      /^https?:\/\//.test(tracking)
+        ? `Tracking: <a href="${escapeHtml(tracking)}">${escapeHtml(tracking)}</a>`
+        : `Tracking: <code>${escapeHtml(tracking)}</code>`,
+    );
+  }
+  return `    <p>${parts.join(" &middot; ")}</p>\n`;
+}
+
 function formatFields(el: EmElement): string {
   if (!el.fields || el.fields.length === 0) return "";
   return el.fields.map((f) => (f.type ? `${f.name}: ${f.type}` : f.name)).join(", ");
@@ -57,22 +89,30 @@ function elementDetail(el: EmElement): string {
   return parts.map(escapeHtml).join(" &middot; ");
 }
 
-function renderElementsTable(elements: EmElement[]): string {
+function renderElementsTable(elements: EmElement[], modelKey: string): string {
   const rows = elements
     .map((el) => {
       const annotations: string[] = [];
       if (el.issue) annotations.push(`<div><span class="badge warn">issue</span> ${escapeHtml(el.issue)}</div>`);
       if (el.divergence) annotations.push(`<div><span class="badge">divergence</span> ${escapeHtml(el.divergence)}</div>`);
-      return `      <tr>
+      // The fragment jump target for THIS page is always local ("#<ref>") — a
+      // relative deep link never needs the "<model-key>/slices/<key>.html"
+      // prefix when it's already pointing at the page it's sitting on. The
+      // full portable citation (what elementDeepLink returns) is shown as
+      // the visible, copyable permalink text instead, so a reader can grab
+      // the whole address without leaving the page.
+      const deepLink = elementDeepLink(modelKey, el.ref);
+      return `      <tr id="${escapeHtml(el.ref)}">
         <td>${escapeHtml(el.kind)}</td>
         <td>${escapeHtml(el.name)}</td>
         <td>${elementDetail(el)}${annotations.join("")}</td>
+        <td class="permalink"><a href="#${escapeHtml(el.ref)}" title="Deep link: ${escapeHtml(deepLink)}">#${escapeHtml(el.ref)}</a></td>
       </tr>`;
     })
     .join("\n");
 
   return `    <table>
-      <thead><tr><th>Kind</th><th>Name</th><th>Detail</th></tr></thead>
+      <thead><tr><th>Kind</th><th>Name</th><th>Detail</th><th>Ref</th></tr></thead>
       <tbody>
 ${rows}
       </tbody>
@@ -107,10 +147,11 @@ export function renderSlicePage(args: SlicePageArgs): string {
       <div class="stat"><span class="label">Status</span>${statusBadge(doc.status)}</div>
       <div class="stat"><span class="label">Drift signal</span>${driftBadge(doc.driftSignal)}</div>
       <div class="stat"><span class="label">Implemented in</span>${implementedInHtml(doc.implementedIn)}</div>
+      <div class="stat"><span class="label">Ratified by</span>${ratifiedByHtml(doc.ratifiedBy, doc.ratifiedOn)}</div>
     </div>
-    <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(sliceDiagramFile)}"></object></div>
+${ownerTrackingHtml(doc.owner, doc.tracking)}    <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(sliceDiagramFile)}"></object></div>
     <p class="full-diagram-link"><a href="${escapeHtml(diagramFile)}">View full model diagram &rarr;</a></p>
-${renderElementsTable(slice.elements)}
+${renderElementsTable(slice.elements, args.modelKey)}
 ${docSection}`;
 
   return layout(`${slice.name} — ${modelName}`, body, "../../index.html", [
