@@ -1,0 +1,60 @@
+{
+  "name": "@milehimikey/em-portal",
+  "version": "0.1.0",
+  "description": "Stakeholder-facing static portal for em event models — a multi-model, read-only browser built from `em export`/`em status --json`",
+  "type": "module",
+  "bin": {
+    "em-portal": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/cli.ts",
+    "em-portal": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest": "npm run build",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "author": "milehimikey",
+  "homepage": "https://github.com/milehimikey/em-portal#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milehimikey/em-portal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/milehimikey/em-portal/issues"
+  },
+  "keywords": [
+    "event-modeling",
+    "portal",
+    "static-site",
+    "dashboard",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "marked": "^18.0.11"
+  },
+  "devDependencies": {
+    "@milehimikey/em": "file:vendor/milehimikey-em-1.8.1.tgz",
+    "@types/node": "^22.0.0",
+    "jsdom": "^26.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
+  }
+}
