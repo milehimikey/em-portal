@@ -48,6 +48,15 @@ export interface SliceDocJoin {
   driftSignal: "in-sync" | "never-implemented" | "unpropagated-delta" | "implemented-without-link" | null;
   ratifiedBy: string | null;
   ratifiedOn: string | null;
+  /** `owner:`/`tracking:` frontmatter (added in schema 1.9, MIL-171) — who
+   *  holds this slice (a person or team, free text) and a link into an
+   *  external tracker mirroring it, respectively. Both hand-filled,
+   *  `null` when absent — declared here even though em-portal was written
+   *  against schema 1.8, per the "tolerate unknown fields" policy: a field
+   *  we don't yet know about would simply be ignored, but these are worth
+   *  surfacing once they exist. */
+  owner: string | null;
+  tracking: string | null;
 }
 
 export interface TypeRef {

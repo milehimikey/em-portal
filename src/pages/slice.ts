@@ -43,6 +43,35 @@ function implementedInHtml(implementedIn: string | null): string {
   return `<code>${escapeHtml(implementedIn)}</code>`;
 }
 
+/** `ratifiedBy`/`ratifiedOn` (schema 1.8, MIL-165) — who signed off on this
+ *  doc's current status/version, and when. Both are hand-filled and often
+ *  absent even on an `implemented` doc predating the feature (or ratified by
+ *  hand before it existed) — that's routine, not a gap, so it renders as a
+ *  plain "not recorded" note rather than a warning badge. */
+function ratifiedByHtml(ratifiedBy: string | null, ratifiedOn: string | null): string {
+  if (!ratifiedBy) return `<span class="no-doc">not recorded</span>`;
+  return ratifiedOn ? `${escapeHtml(ratifiedBy)} <span class="pattern">(${escapeHtml(ratifiedOn)})</span>` : escapeHtml(ratifiedBy);
+}
+
+/** `owner`/`tracking` (schema 1.9, MIL-171) — rendered as one optional line
+ *  beneath the stat row, omitted entirely when neither is set (same
+ *  "nothing to report" convention `em status`'s own text report uses for
+ *  its doc-issues line), rather than two more always-present "not set"
+ *  tiles cluttering the common case. */
+function ownerTrackingHtml(owner: string | null, tracking: string | null): string {
+  if (!owner && !tracking) return "";
+  const parts: string[] = [];
+  if (owner) parts.push(`Owner: <strong>${escapeHtml(owner)}</strong>`);
+  if (tracking) {
+    parts.push(
+      /^https?:\/\//.test(tracking)
+        ? `Tracking: <a href="${escapeHtml(tracking)}">${escapeHtml(tracking)}</a>`
+        : `Tracking: <code>${escapeHtml(tracking)}</code>`,
+    );
+  }
+  return `    <p>${parts.join(" &middot; ")}</p>\n`;
+}
+
 function formatFields(el: EmElement): string {
   if (!el.fields || el.fields.length === 0) return "";
   return el.fields.map((f) => (f.type ? `${f.name}: ${f.type}` : f.name)).join(", ");
@@ -118,8 +147,9 @@ export function renderSlicePage(args: SlicePageArgs): string {
       <div class="stat"><span class="label">Status</span>${statusBadge(doc.status)}</div>
       <div class="stat"><span class="label">Drift signal</span>${driftBadge(doc.driftSignal)}</div>
       <div class="stat"><span class="label">Implemented in</span>${implementedInHtml(doc.implementedIn)}</div>
+      <div class="stat"><span class="label">Ratified by</span>${ratifiedByHtml(doc.ratifiedBy, doc.ratifiedOn)}</div>
     </div>
-    <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(sliceDiagramFile)}"></object></div>
+${ownerTrackingHtml(doc.owner, doc.tracking)}    <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(sliceDiagramFile)}"></object></div>
     <p class="full-diagram-link"><a href="${escapeHtml(diagramFile)}">View full model diagram &rarr;</a></p>
 ${renderElementsTable(slice.elements, args.modelKey)}
 ${docSection}`;
