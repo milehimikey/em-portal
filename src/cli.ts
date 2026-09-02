@@ -9,7 +9,7 @@ const program = new Command();
 program
   .name("em-portal")
   .description("Stakeholder-facing static portal for em event models")
-  .version("0.1.0");
+  .version("0.2.0");
 
 program
   .command("build")

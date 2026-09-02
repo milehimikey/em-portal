@@ -7,6 +7,7 @@
 //     index.html                 landing page: em status rollup + model index
 //     <model-key>/
 //       index.html                model page: diagram + slice table
+//       walkthrough.html          guided first read (MIL-174) over this model
 //       diagram.svg
 //       slices/
 //         <slice-key>.html        slice page: diagram, doc, driftSignal, PR link
@@ -16,7 +17,7 @@
 // convention) so slice keys from different models can never collide, even
 // without a cross-file dedupe pass.
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { emExportJson, emRenderModel, emRenderSlice, emStatusJson } from "./em/run.js";
 import { checkExportSchemaCompatible, ExportDoc } from "./em/exportDoc.js";
@@ -27,6 +28,8 @@ import { dedupe, kebabSlug } from "./slug.js";
 import { renderIndexPage } from "./pages/index.js";
 import { renderModelPage } from "./pages/model.js";
 import { renderSlicePage } from "./pages/slice.js";
+import { renderWalkthroughPage } from "./pages/walkthrough.js";
+import { buildWalkthroughSteps } from "./walkthroughSteps.js";
 import { ModelSummary, PortalSummary, SliceSummary } from "./pages/types.js";
 
 export interface BuildOptions {
@@ -122,6 +125,18 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
       slices: sliceSummaries,
     });
     await writeFile(join(modelDir, "index.html"), modelPage, "utf8");
+
+    // MIL-174: the guided first read — built from the SAME diagram.svg just
+    // written to disk (read back rather than re-rendered, so this never
+    // shells out to `em` a second time for a file already sitting there).
+    const diagramSvgSource = await readFile(join(modelDir, diagramFile), "utf8");
+    const walkthroughPage = renderWalkthroughPage({
+      modelKey,
+      modelName: doc.model.name ?? modelKey,
+      steps: buildWalkthroughSteps(doc),
+      diagramSvgSource,
+    });
+    await writeFile(join(modelDir, "walkthrough.html"), walkthroughPage, "utf8");
 
     modelSummaries.push({
       key: modelKey,

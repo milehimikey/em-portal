@@ -108,6 +108,68 @@ describe("buildPortal", () => {
   });
 });
 
+describe("buildPortal — guided first read (MIL-174)", () => {
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await mkdtemp(join(tmpdir(), "em-portal-walkthrough-test-"));
+    await buildPortal([ORDER_FULFILLMENT], { outDir, title: "Walkthrough Test Portal" });
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  it("emits a walkthrough page for the model", async () => {
+    expect(existsSync(join(outDir, "order-fulfillment", "walkthrough.html"))).toBe(true);
+  });
+
+  it("links to the walkthrough from the model page ('First read')", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "index.html"), "utf8");
+    expect(html).toContain('href="walkthrough.html"');
+    expect(html).toContain("First read");
+  });
+
+  it("links to the first model's walkthrough from the landing page", async () => {
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain('href="order-fulfillment/walkthrough.html"');
+    expect(html).toContain("First read");
+  });
+
+  it("embeds the step data as a JSON blob covering all 14 steps, and the inline diagram it spotlights", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    expect(html).toContain('<script type="application/json" id="wt-data">');
+    expect(html).toContain('"id":"intro"');
+    expect(html).toContain('"id":"pattern-state-change"');
+    expect(html).toContain('"id":"marker-note"');
+    expect(html).toContain('"id":"next"');
+    // The model's own diagram is inlined (not <object>-embedded) so the
+    // client-side spotlight script can reach its data-slice nodes directly.
+    expect(html).toContain('id="wt-diagram"');
+    expect(html).toContain("data-slice=");
+    expect(html).not.toContain("<?xml");
+  });
+
+  it("teaches with real element/slice names from THIS model, not placeholder copy", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    // order-fulfillment's first event/command are "Order Placed"/"Place Order" (Browse Catalog slice).
+    expect(html).toContain("Order Placed");
+    expect(html).toContain("Place Order");
+    // This fixture model has a real Automation slice (Capture Payment) but no Translation slice.
+    expect(html).toContain("Capture Payment");
+    expect(html).toContain("This model has no Translation slice yet");
+  });
+
+  it("gives the walkthrough Next/Prev controls and a keyboard/exit affordance", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    expect(html).toContain('id="wt-prev"');
+    expect(html).toContain('id="wt-next"');
+    expect(html).toContain("Exit walkthrough");
+    expect(html).toContain("ArrowRight");
+    expect(html).toContain("ArrowLeft");
+  });
+});
+
 describe("buildPortal — cross-model deep links (MIL-173)", () => {
   let outDir: string;
 
