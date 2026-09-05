@@ -128,7 +128,13 @@ ${linkRows}
     </table>`
       : "";
 
-  const body = `${renderStatusSection(status)}
+  const firstReadHref = summary.models[0] ? `${escapeHtml(summary.models[0].key)}/walkthrough.html` : null;
+  const firstReadBanner = firstReadHref
+    ? `    <p><a class="first-read-cta" href="${firstReadHref}">First read: new here? Learn the notation on ${escapeHtml(summary.models[0].name)} &rarr;</a></p>`
+    : "";
+
+  const body = `${firstReadBanner}
+${renderStatusSection(status)}
     <h2>Models</h2>
     <table>
       <thead><tr><th>Model</th><th>Slices</th><th>Source</th></tr></thead>

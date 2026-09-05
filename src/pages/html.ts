@@ -55,6 +55,7 @@ const STYLE = `
   .permalink a { color: inherit; }
   code { background: #eee; padding: .05rem .3rem; border-radius: 3px; }
   footer { max-width: 1000px; margin: 0 auto; padding: 0 1.25rem 2rem; font-size: 12px; color: #7b8794; }
+  .first-read-cta { display: inline-block; margin: .5rem 0 1rem; padding: .5rem 1rem; border-radius: 6px; background: #1f2933; color: #fff; text-decoration: none; font-weight: 600; }
 `;
 
 export interface Crumb {

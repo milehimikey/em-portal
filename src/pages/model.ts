@@ -64,6 +64,7 @@ export function renderModelPage(args: ModelPageArgs): string {
 
   const body = `    <p><code>${escapeHtml(file)}</code></p>
     <h1>${escapeHtml(modelName)}</h1>
+    <p><a class="first-read-cta" href="walkthrough.html">First read: learn the notation on this model &rarr;</a></p>
     <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(diagramFile)}"></object></div>
     <p class="full-diagram-link"><a href="${escapeHtml(diagramFile)}">Open full diagram &rarr;</a></p>
     <table>

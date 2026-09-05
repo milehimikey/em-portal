@@ -14,7 +14,9 @@ front and a way to navigate a system of several models, not a flat per-model sit
 
 ## Status
 
-**0.1.0 — read-only multi-model browser.** See [What 0.1.0 includes](#what-01-includes) below.
+**0.2.0 — read-only multi-model browser + guided first read.** See
+[What 0.1.0 includes](#what-01-includes) and [What 0.2.0 adds](#what-020-adds-the-guided-first-read)
+below.
 
 ## Quickstart
 
@@ -25,9 +27,10 @@ npx em-portal build models/*/*.em -o site
 
 ```
 site/
-  index.html                 # landing page: em status rollup (state up front)
+  index.html                 # landing page: em status rollup (state up front) + "First read" entry point
   <model-key>/
     index.html                # model page: diagram + slice table
+    walkthrough.html          # guided first read (0.2.0): teaches the notation on THIS model
     diagram.svg
     slices/
       <slice-key>.html         # slice page: diagram, doc, driftSignal, PR link
@@ -146,14 +149,9 @@ em-portal.
 - Fully static, self-contained output; deterministic builds (same inputs -> byte-identical
   site, verified in `test/build.test.ts`); no LLM anywhere.
 
-**Deferred to 0.2.0** (MIL-174, "guided first read"): the onboarding/teaching layer — real
-click-driven interaction that annotates a first-time reader's own model as they encounter each
-element/pattern kind, rather than a glossary page. 0.1.0's pages are informative but not
-teaching-aware.
-
 **Deferred to 0.3.0** (MIL-175, "async review intake"): a "raise a question" affordance on a
-slice page, triaged into an `issue "..."` marker through the normal ratified path. 0.1.0 is
-read-only.
+slice page, triaged into an `issue "..."` marker through the normal ratified path. The portal is
+still read-only otherwise.
 
 **Also deferred / open, not yet built**:
 - A real GitHub Pages/bucket deploy workflow wired to a specific target repo — see
@@ -161,8 +159,55 @@ read-only.
   and tests, since it has no real event models of its own to publish.
 - Parallelizing the per-model `em export`/`em render` calls (they run sequentially today — see
   [Open questions](#open-questions)).
-- Any client-side JS (search, filtering, sort) — pages are plain static HTML, same posture as
-  `em catalog`.
+- Any client-side JS beyond the walkthrough's own stepper (search, filtering, sort across the
+  slice table) — every other page is still plain static HTML, same posture as `em catalog`.
+
+## What 0.2.0 adds: the guided first read
+
+**MIL-174.** A first-time, non-technical reader clicks "First read" — prominent on the landing
+page (pointed at the first model given to `em-portal build`) and on every model page (pointed at
+that model) — and gets a self-paced, Next/Prev walkthrough that teaches the notation using **the
+team's own model as every example**, never a generic glossary:
+
+1. Time runs left to right — anchored to the model's own first slice.
+2. A real **event**, **command**, and **view/read model** from this model, each with its
+   definition and a color-keyed callout naming the actual element.
+3. **Personas & swimlanes** — this model's own declared personas and contexts.
+4. The **four slice patterns** (State Change, State View, Automation, Translation), each taught
+   on the first real slice of that pattern this model has — a pattern the model doesn't use yet
+   is still explained, but says so plainly ("this model has no Translation slice yet") instead of
+   pointing at nothing.
+5. The three **markers** (amber note = linked design doc, red issue = open question, teal
+   divergence = accepted deviation), each on a real marked-up element when this model has one.
+6. **Status & ratification** — the draft → reviewed → ready-to-implement → implemented lifecycle,
+   a real example of this model's own slice status, that a named human ratifies (`ratifiedBy`),
+   and a link to the landing page's status rollup as the "is this healthy" view.
+7. Where to go next: the slice table, a real slice page, the status rollup.
+
+Every step is picked **deterministically at build time** from the model's own `em export` JSON
+(first occurrence in model order — see `src/walkthroughSteps.ts`, unit-tested independently of any
+HTML) and embedded in the generated page as a small JSON blob; a vanilla-JS stepper (no
+dependency, inlined, no fetch of any other page) drives Next/Prev, the left/right arrow keys, a
+numbered step nav, and a visible "Exit walkthrough" link/Escape key at every step. The step count
+is always the same 14 regardless of what the model contains, so the progress indicator ("Step 4
+of 14") never depends on how much of the model's own vocabulary happens to show up.
+
+**Highlight mechanism** (verified against a real `em render` SVG, not assumed): `em`'s renderer
+already tags every element's node group with `data-slice="<index>"` and embeds an
+`<metadata id="em-slices">` block — the same mechanism `em watch --serve`'s own Review mode
+storyboard uses to spotlight one slice at a time. The walkthrough inlines the model's own
+`diagram.svg` directly into the page (not `<object>`-embedded, which isn't reliably
+script-reachable from `file://`) and reuses that same `data-slice` attribute to dim every other
+slice while a step is active — a real, intentional, already-load-bearing integration point, not a
+new one invented for this feature.
+
+There is deliberately **no per-element spotlight** inside the diagram: `em`'s SVG node ids come
+from a model-wide, name-only slug (`makeId()` in the em repo), independent of `em export`'s own
+stable `<sliceKey>/<kind>.<slug>` ref scheme and never published as a stable contract — relying on
+it would mean treating an internal Graphviz `<title>` as an API. Single-element steps degrade
+honestly instead: a color-keyed callout card (kind + name + a same-page link to the real element),
+styled to match the diagram's own kind/marker colors, so it reads as the same visual language
+rather than a second one.
 
 ## CI publish recipe
 

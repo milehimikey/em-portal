@@ -1,6 +1,6 @@
 {
   "name": "@milehimikey/em-portal",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Stakeholder-facing static portal for em event models — a multi-model, read-only browser built from `em export`/`em status --json`",
   "type": "module",
   "bin": {

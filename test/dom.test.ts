@@ -106,4 +106,36 @@ describe("generated pages (DOM)", () => {
     expect(docSection).toBeTruthy();
     expect(docSection?.querySelector("h1, h2")).toBeTruthy();
   });
+
+  it("walkthrough page (MIL-174): 14 step panels, one visible, the rest hidden, in a real DOM", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const panels = doc.querySelectorAll(".wt-step");
+    expect(panels.length).toBe(14);
+    expect(panels[0].hasAttribute("hidden")).toBe(false);
+    for (let i = 1; i < panels.length; i++) {
+      expect(panels[i].hasAttribute("hidden")).toBe(true);
+    }
+  });
+
+  it("walkthrough page: the model's own diagram is inlined as a real <svg>, not an <object> embed", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const svg = doc.querySelector("#wt-diagram");
+    expect(svg?.tagName.toLowerCase()).toBe("svg");
+    expect(doc.querySelectorAll("[data-slice]").length).toBeGreaterThan(0);
+    expect(doc.querySelector("object.diagram")).toBeNull();
+  });
+
+  it("walkthrough page: Prev starts disabled, Next and the exit link resolve back to the model page", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    expect(doc.querySelector("#wt-prev")?.hasAttribute("disabled")).toBe(true);
+    expect(doc.querySelector("#wt-next")).toBeTruthy();
+    const exitLink = Array.from(doc.querySelectorAll("a")).find((a) => a.textContent === "Exit walkthrough");
+    expect(exitLink?.getAttribute("href")).toBe("index.html");
+  });
 });
