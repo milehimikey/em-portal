@@ -72,11 +72,13 @@ em-portal is a **separate package from `em`** — it never imports em's internal
 fact it shows comes from shelling out to the installed `em` CLI (a real dependency of your
 project, resolved the normal npm way):
 
-- `em export <file>` — the normalized model as JSON (schema 1.8+): slices, elements, stable
-  `ref`s, the slice-doc frontmatter join (`status`, `driftSignal`, `implementedIn`, ...).
+- `em export <file>` — the normalized model as JSON (schema 1.8+, currently 1.20): slices,
+  elements, stable `ref`s, the slice-doc frontmatter join (`status`, the shipped record,
+  `driftSignal`, certification facts, `implementedIn`, ...).
 - `em status <files...> --json` — the state-of-the-system rollup across every model given:
-  slices by lifecycle status, drift-signal breakdown, invariant coverage (with `--tests`),
-  open issues, and freshness (last-conformed revision, commits/slice-PRs behind HEAD).
+  slices by lifecycle status (including shipped), drift-signal breakdown, invariant coverage
+  (with `--tests`), open issues, and freshness (last-conformed revision, commits/slice-PRs
+  behind HEAD, unruled conformance findings).
 - `em render <file>` / `em render <file> --slice <name>` — the model's full diagram and each
   slice's own canonical-pattern diagram (SVG).
 

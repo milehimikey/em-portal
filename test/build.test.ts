@@ -73,6 +73,18 @@ describe("buildPortal", () => {
     expect(svg).toContain("<svg");
   });
 
+  it("renders the shipped record and certification from em 1.21's doc join", async () => {
+    // order-fulfillment/slices/checkout.md carries the full shipped+certified
+    // frontmatter (shippedVersion/shippedOn, conformedVersion/At/On) — the
+    // real `em export` join, not a synthetic doc, drives these stats.
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "checkout.html"), "utf8");
+    expect(html).toContain("Shipped");
+    expect(html).toContain("2026-10-12");
+    expect(html).toContain("Certified");
+    expect(html).toContain("4f2a9c05d1b");
+    expect(html).toContain("in-sync");
+  });
+
   it("renders a bound slice doc's markdown body, not just its frontmatter", async () => {
     // order-fulfillment/slices/checkout.md has real prose in it (see fixtures/README) —
     // em export's own doc join never carries the body (frontmatter only), so this

@@ -26,9 +26,11 @@ function statusBadge(hasDoc: boolean, status: string | null): string {
   return `<span class="badge ${cls}">${escapeHtml(status)}</span>`;
 }
 
+/** Same severity rule as slice.ts's driftBadge: only `implemented-without-link`
+ *  is a defect in em 1.21's drift vocabulary; the rest are expected states. */
 function driftBadge(drift: string | null): string {
   if (!drift) return "";
-  const cls = drift === "in-sync" ? "ok" : drift === "never-implemented" ? "warn" : "bad";
+  const cls = drift === "in-sync" ? "ok" : drift === "implemented-without-link" ? "bad" : "warn";
   return `<span class="badge ${cls}">${escapeHtml(drift)}</span>`;
 }
 
