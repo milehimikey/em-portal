@@ -110,10 +110,23 @@ function findSystemManifestAbove(file: string): string | null {
   }
 }
 
-/** Reads, rewrites (rewriteSliceDocLinks), and writes back one rendered file. */
+/** Makes a rendered SVG resize with its container/window: drops the root
+ *  element's fixed `width`/`height` attributes, keeping `viewBox` (which em
+ *  always writes). A viewBox-only SVG scales to fit — the browser window on
+ *  direct navigation, the embedding element's CSS box in an `<object>`/
+ *  inline embed — instead of rendering at a fixed canvas size that a big
+ *  model blows straight past. First `<svg>` tag only: em's canvas map.html
+ *  inlines SVGs with its own frame sizing and is never passed through here. */
+export function responsiveSvg(content: string): string {
+  return content.replace(/<svg\b([^>]*)>/, (_m, attrs: string) => `<svg${attrs.replace(/\s(?:width|height)="[^"]*"/g, "")}>`);
+}
+
+/** Reads, rewrites (rewriteSliceDocLinks + responsiveSvg for SVGs), and
+ *  writes back one rendered file. */
 async function retargetFile(path: string, sliceKeys: ReadonlySet<string>, prefix: string): Promise<void> {
   const content = await readFile(path, "utf8");
-  await writeFile(path, rewriteSliceDocLinks(content, sliceKeys, prefix), "utf8");
+  const rewritten = rewriteSliceDocLinks(content, sliceKeys, prefix);
+  await writeFile(path, path.endsWith(".svg") ? responsiveSvg(rewritten) : rewritten, "utf8");
 }
 
 export async function buildPortal(files: string[], opts: BuildOptions): Promise<BuildResult> {
@@ -250,15 +263,43 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
     });
     await writeFile(join(modelDir, "index.html"), modelPage, "utf8");
 
-    // MIL-174: the guided first read — built from the SAME diagram.svg just
-    // written to disk (read back rather than re-rendered, so this never
-    // shells out to `em` a second time for a file already sitting there).
-    const diagramSvgSource = await readFile(join(modelDir, diagramFile), "utf8");
+    // MIL-174: the guided first read — built from SVGs already written to
+    // disk (read back rather than re-rendered, so this never shells out to
+    // `em` a second time for a file already sitting there).
+    //
+    // A model WITH storylines teaches on its FIRST storyline, not the full
+    // diagram: the full render of a grown model is the 80-column wall the
+    // canvas exists to replace, and a first-time reader needs one chapter,
+    // not the whole book. The storyline SVG renumbers `data-slice` from 0
+    // in column order, so the steps are built from a doc filtered to that
+    // storyline's slices with indexes remapped to match (timeline order is
+    // preserved by the filter — em renders the storyline's columns in the
+    // same order). Its doc links were retargeted for storylines/ depth
+    // (../slices/); inlined into walkthrough.html at the model root they
+    // need the model page's own prefix instead.
+    const firstStoryline = doc.model.storylines[0] ?? null;
+    let walkthroughDoc = doc;
+    let walkthroughSvgSource: string;
+    if (firstStoryline) {
+      const storylineKeys = new Set(firstStoryline.sliceKeys);
+      walkthroughDoc = {
+        ...doc,
+        model: {
+          ...doc.model,
+          slices: doc.model.slices.filter((s) => storylineKeys.has(s.key)).map((s, i) => ({ ...s, index: i })),
+        },
+      };
+      const storylineSvg = join(modelDir, "storylines", `${kebabSlug(firstStoryline.name)}.svg`);
+      walkthroughSvgSource = (await readFile(storylineSvg, "utf8")).replaceAll('href="../slices/', 'href="slices/');
+    } else {
+      walkthroughSvgSource = await readFile(join(modelDir, diagramFile), "utf8");
+    }
     const walkthroughPage = renderWalkthroughPage({
       modelKey,
       modelName: doc.model.name ?? modelKey,
-      steps: buildWalkthroughSteps(doc),
-      diagramSvgSource,
+      steps: buildWalkthroughSteps(walkthroughDoc),
+      diagramSvgSource: walkthroughSvgSource,
+      storylineName: firstStoryline?.name ?? null,
     });
     await writeFile(join(modelDir, "walkthrough.html"), walkthroughPage, "utf8");
 

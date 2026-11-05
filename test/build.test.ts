@@ -178,6 +178,42 @@ describe("buildPortal — storyline canvas and system map (GH #4)", () => {
     expect(html).toContain('<a href="../storylines/map.html">Fulfil an order</a>');
   });
 
+  it("teaches the walkthrough on the first storyline, not the full diagram, when storylines exist", async () => {
+    const html = await readFile(join(outDir, "fulfillment", "walkthrough.html"), "utf8");
+    expect(html).toContain("Taught on the <strong>Fulfil an order</strong> storyline");
+    expect(html).toContain('href="storylines/map.html"');
+    // The inlined teaching diagram is the storyline's own render: its
+    // em-slices metadata carries the storyline's slices, renumbered from 0,
+    // and nothing from the "Handle a return" storyline.
+    const svgStart = html.indexOf('<svg id="wt-diagram"');
+    const svg = html.slice(svgStart, html.indexOf("</svg>", svgStart));
+    expect(svg).toContain("Receive Order");
+    expect(svg).not.toContain("Return Confirmation");
+    expect(svg).toContain('data-slice="0"');
+    // Inlined storyline doc links got the model-root prefix, not ../.
+    expect(svg).not.toContain('href="../slices/');
+  });
+
+  it("keeps the full-diagram walkthrough, without a scope note, for a model with no storylines", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "walkthrough.html"), "utf8");
+    expect(html).not.toContain("Taught on the");
+    expect(html).toContain("Browse Catalog");
+  });
+
+  it("strips fixed dimensions from rendered SVG roots so diagrams resize (viewBox kept)", async () => {
+    for (const file of [
+      join(outDir, "order-fulfillment", "diagram.svg"),
+      join(outDir, "order-fulfillment", "slices", "checkout.svg"),
+      join(outDir, "fulfillment", "storylines", "fulfil-an-order.svg"),
+    ]) {
+      const svg = await readFile(file, "utf8");
+      const root = svg.slice(svg.indexOf("<svg"), svg.indexOf(">", svg.indexOf("<svg")) + 1);
+      expect(root).toContain("viewBox=");
+      expect(root).not.toMatch(/\swidth="/);
+      expect(root).not.toMatch(/\sheight="/);
+    }
+  });
+
   it("retargets em's slice-doc links in every rendered artifact to the portal's slice pages", async () => {
     // em bakes hrefs to `slices/<key>.md` (relative to the SOURCE tree) into
     // every SVG; the portal rewrites known slice keys to its own pages.

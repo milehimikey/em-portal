@@ -326,10 +326,16 @@ export interface WalkthroughPageArgs {
   modelKey: string;
   modelName: string;
   steps: WalkthroughStep[];
-  /** The model's own full `em render` diagram.svg, as raw file content —
-   *  inlined into the page (not <object>-embedded) so the client-side
-   *  spotlight script can reach its `data-slice` nodes. */
+  /** The inlined teaching diagram, as raw SVG file content — inlined (not
+   *  <object>-embedded) so the client-side spotlight script can reach its
+   *  `data-slice` nodes. For a model with storylines this is the FIRST
+   *  storyline's own render (and `steps` were built against its renumbered
+   *  slice indexes); otherwise the full diagram.svg. */
   diagramSvgSource: string;
+  /** The storyline the walkthrough teaches on, or null when it's the whole
+   *  model (no storyline blocks). Shown as a scope note so a reader knows
+   *  they're looking at one chapter, not the whole system. */
+  storylineName: string | null;
 }
 
 export function renderWalkthroughPage(args: WalkthroughPageArgs): string {
@@ -353,10 +359,14 @@ ${renderStepBody(s, modelName)}
   // step, nothing that duplicates the panel markup above.
   const navData = steps.map((s) => ({ id: s.id, title: s.title, sliceIndex: s.sliceIndex }));
 
+  const scopeNote = args.storylineName
+    ? `    <p class="pattern">Taught on the <strong>${escapeHtml(args.storylineName)}</strong> storyline — this model's first chapter, not its whole timeline. The <a href="storylines/map.html">storyline canvas</a> shows how the chapters connect.</p>\n`
+    : "";
+
   const body = `    <style>${WALKTHROUGH_STYLE}</style>
     <p class="pattern">Guided first read &middot; ${escapeHtml(modelName)}</p>
     <h1>First read: ${escapeHtml(modelName)}</h1>
-    <p id="wt-progress" class="pattern" aria-live="polite">Step 1 of ${steps.length}: ${escapeHtml(steps[0]?.title ?? "")}</p>
+${scopeNote}    <p id="wt-progress" class="pattern" aria-live="polite">Step 1 of ${steps.length}: ${escapeHtml(steps[0]?.title ?? "")}</p>
     <div class="wt-nav">
       <button id="wt-prev" type="button" disabled>&larr; Prev</button>
       <button id="wt-next" type="button" class="wt-primary">Next &rarr;</button>

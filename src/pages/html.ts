@@ -42,10 +42,10 @@ const STYLE = `
   .stat .n { font-size: 1.4rem; font-weight: 700; display: block; }
   .stat .label { font-size: 12px; color: #52606d; }
   .diagram-frame {
-    height: 420px; border: 1px solid #ddd; margin: 1rem 0; overflow: hidden; background: #fff;
-    display: flex; align-items: flex-start; justify-content: center;
+    border: 1px solid #ddd; margin: 1rem 0; overflow: auto; background: #fff;
+    max-height: 75vh;
   }
-  object.diagram { width: auto; height: 100%; max-width: 100%; }
+  object.diagram { display: block; width: 100%; height: auto; }
   .full-diagram-link { margin: 0 0 1rem; font-size: 13px; }
   .doc { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #ddd; }
   .doc h1 { font-size: 1.3rem; }
