@@ -2,8 +2,16 @@
 schemaVersion: 1
 pattern: state-change
 swimlane: Customer → Payment
-status: ready-to-implement
+status: implemented
 version: 1
+ratifiedBy: Dana Smith
+ratifiedOn: 2026-09-30
+implementedIn: https://github.com/example/shop/pull/41
+shippedVersion: 1
+shippedOn: 2026-10-12
+conformedVersion: 1
+conformedAt: 4f2a9c05d1b
+conformedOn: 2026-10-13
 ---
 # Slice: Checkout
 

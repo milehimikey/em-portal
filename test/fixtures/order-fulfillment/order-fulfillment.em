@@ -6,9 +6,16 @@ persona Manager
 context Order
 context Payment
 
-# A named type (MIL-64): declared once, referenced below as an array (`LineItem[]`) from the
-# command that accepts an order's line items. Also gives `em typespec` (MIL-159, experimental)
-# a real declared-type-to-model mapping to prove against this same file.
+# Named types (MIL-64): declared once, referenced below (including as an array, `LineItem[]`)
+# from the command that accepts an order's line items. Also gives `em typespec` (MIL-159,
+# experimental) a real declared-type-to-model mapping to prove against this same file.
+# `Money` is a declared type whose fields use the public type table, so the `public`
+# elements below can carry it (strict public types, MIL-237).
+type Money {
+  amount: decimal
+  currency: string
+}
+
 type LineItem {
   sku: string
   quantity: int
@@ -29,19 +36,19 @@ slice "Browse Catalog" source "https://linear.app/team/issue/MIL-60" {
   # of the model's published integration surface, so it's also the one that ends up in the
   # generated TypeSpec contract, along with `Place Order` (same slice).
   event Order Placed @Order public note "notes/order-placed.md" {
-    orderId assigned
-    customerId
+    orderId: uuid assigned
+    customerId: uuid
     total: Money
-    placedAt: Instant assigned
+    placedAt: datetime assigned
   }
 }
 
 # --- View pattern: event -> read model -> UI ---
 slice "View Open Orders" {
   view Open Orders public from "Order Placed" note "slices/view-open-orders.md" {
-    orderId
+    orderId: uuid
     total: Money
-    status
+    status: string
   }
   ui Order List @Customer
 }

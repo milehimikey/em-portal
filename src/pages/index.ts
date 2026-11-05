@@ -29,7 +29,10 @@ function renderStatusSection(status: StatusDoc): string {
   const documented = total - s.noDoc;
   const d = status.driftSignal;
   const stats = [
-    { n: `${s.implemented}/${total}`, label: "implemented" },
+    // `shipped` (status schema 1.9, MIL-283), not working-status `implemented`,
+    // is the lifecycle headline since em 1.15: a slice whose next version is
+    // open as a draft still has its earlier version shipped.
+    { n: `${s.shipped}/${total}`, label: "shipped" },
     { n: `${documented}/${total}`, label: `documented (${pct(documented, total)})` },
     { n: `${status.issues.openIssues}`, label: "open issues" },
     {
@@ -46,9 +49,10 @@ function renderStatusSection(status: StatusDoc): string {
     .map(
       (c) => `<tr>
         <td><code>${escapeHtml(c.file)}</code></td>
-        <td>${c.hasStateFile && c.lastConformance ? escapeHtml(`${c.lastConformance.revision} (${c.lastConformance.date})`) : "&mdash;"}</td>
+        <td>${c.hasStateFile && c.lastConformance ? escapeHtml(`${c.lastConformance.revision} (${c.lastConformance.date})`) + (c.lastConformance.partial ? ` <span class="badge warn">partial</span>` : "") : "&mdash;"}</td>
         <td>${c.commitsBehindHead ?? "&mdash;"}</td>
         <td>${c.slicePRsBehindHead ?? "&mdash;"}</td>
+        <td>${c.unruledFindings == null ? "&mdash;" : c.unruledFindings > 0 ? `<span class="badge warn">${c.unruledFindings}</span>` : "0"}</td>
         <td>${conformanceBadge(c)}</td>
       </tr>`,
     )
@@ -60,10 +64,11 @@ ${statHtml}
     </div>
     <h2>Slices by status</h2>
     <p>
+      <span class="badge ok">${s.shipped} shipped</span>
       <span class="badge">${s.draft} draft</span>
       <span class="badge">${s.reviewed} reviewed</span>
       <span class="badge">${s.readyToImplement} ready-to-implement</span>
-      <span class="badge ok">${s.implemented} implemented</span>
+      <span class="badge">${s.implemented} implemented</span>
       <span class="badge">${s.noDoc} no doc</span>
       ${s.frontmatterInvalid ? `<span class="badge bad">${s.frontmatterInvalid} frontmatter invalid</span>` : ""}
       ${s.unknown ? `<span class="badge">${s.unknown} unknown status</span>` : ""}
@@ -72,13 +77,14 @@ ${statHtml}
     <p>
       <span class="badge ok">${d.inSync} in-sync</span>
       <span class="badge warn">${d.neverImplemented} never-implemented</span>
-      <span class="badge bad">${d.unpropagatedDelta} unpropagated-delta</span>
+      <span class="badge warn">${d.unpropagatedDelta} unpropagated-delta</span>
+      <span class="badge warn">${d.uncertified} uncertified</span>
       <span class="badge bad">${d.implementedWithoutLink} implemented-without-link</span>
       <span class="badge">${d.notApplicable} n/a (no doc)</span>
     </p>
     <h2>Freshness (conformance)</h2>
     <table>
-      <thead><tr><th>Model</th><th>Last conformed</th><th>Commits behind</th><th>Slice-PRs behind</th><th></th></tr></thead>
+      <thead><tr><th>Model</th><th>Last conformed</th><th>Commits behind</th><th>Slice-PRs behind</th><th>Unruled findings</th><th></th></tr></thead>
       <tbody>
 ${conformanceRows}
       </tbody>

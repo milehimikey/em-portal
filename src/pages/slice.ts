@@ -7,7 +7,7 @@
 // MCP citation and a stakeholder's portal link share.
 
 import { escapeHtml, layout } from "./html.js";
-import { EmElement, EmSlice, SliceDocJoin, SlicePattern } from "../em/exportDoc.js";
+import { EmElement, EmSlice, ShippedRecord, SliceDocJoin, SlicePattern } from "../em/exportDoc.js";
 import { elementDeepLink } from "../refs.js";
 
 const PATTERN_LABEL: Record<SlicePattern, string> = {
@@ -24,9 +24,13 @@ function statusBadge(status: string | null): string {
   return `<span class="badge ${cls}">${escapeHtml(status)}</span>`;
 }
 
+/** Severity follows em 1.21's drift vocabulary (catalog/driftSignal.ts):
+ *  `in-sync` means certified current; `implemented-without-link` is the only
+ *  genuine incoherence (em validate warns on it); `never-implemented`,
+ *  `unpropagated-delta`, and `uncertified` are expected lifecycle states. */
 function driftBadge(drift: string | null): string {
   if (!drift) return `<span class="badge">n/a</span>`;
-  const cls = drift === "in-sync" ? "ok" : drift === "never-implemented" ? "warn" : "bad";
+  const cls = drift === "in-sync" ? "ok" : drift === "implemented-without-link" ? "bad" : "warn";
   return `<span class="badge ${cls}">${escapeHtml(drift)}</span>`;
 }
 
@@ -51,6 +55,29 @@ function implementedInHtml(implementedIn: string | null): string {
 function ratifiedByHtml(ratifiedBy: string | null, ratifiedOn: string | null): string {
   if (!ratifiedBy) return `<span class="no-doc">not recorded</span>`;
   return ratifiedOn ? `${escapeHtml(ratifiedBy)} <span class="pattern">(${escapeHtml(ratifiedOn)})</span>` : escapeHtml(ratifiedBy);
+}
+
+/** The shipped record (schema 1.15+, MIL-283) — THE lifecycle fact since em
+ *  1.15: `status` is only the working state, and a shipped slice can be
+ *  `draft` again while an earlier version stays shipped. "not shipped" is the
+ *  routine pre-ship state, not a warning. A pre-1.15 doc can be shipped with
+ *  no recorded version — render a bare "shipped" rather than inventing one. */
+function shippedHtml(shipped: ShippedRecord | null): string {
+  if (!shipped) return `<span class="no-doc">not shipped</span>`;
+  const version = shipped.version !== null ? `v${shipped.version}` : "shipped";
+  const on = shipped.on ? ` <span class="pattern">(${escapeHtml(shipped.on)})</span>` : "";
+  return `<span class="badge ok">${escapeHtml(version)}</span>${on}`;
+}
+
+/** Certification (schema 1.15+, MIL-214): which slice version the last `em
+ *  slice conform` sweep certified, against which target-repo revision, when.
+ *  "not certified" is em's expected post-ship default (the `uncertified`
+ *  drift signal), so it renders as a plain note, not a warning. */
+function certifiedHtml(version: number | null, at: string | null, on: string | null): string {
+  if (version === null) return `<span class="no-doc">not certified</span>`;
+  const rev = at ? ` at <code>${escapeHtml(/^[0-9a-f]{40}$/i.test(at) ? at.slice(0, 7) : at)}</code>` : "";
+  const date = on ? ` <span class="pattern">(${escapeHtml(on)})</span>` : "";
+  return `v${version}${rev}${date}`;
 }
 
 /** `owner`/`tracking` (schema 1.9, MIL-171) — rendered as one optional line
@@ -145,6 +172,8 @@ export function renderSlicePage(args: SlicePageArgs): string {
     <p class="pattern">${escapeHtml(PATTERN_LABEL[pattern])}</p>
     <div class="stat-row">
       <div class="stat"><span class="label">Status</span>${statusBadge(doc.status)}</div>
+      <div class="stat"><span class="label">Shipped</span>${shippedHtml(doc.shipped)}</div>
+      <div class="stat"><span class="label">Certified</span>${certifiedHtml(doc.conformedVersion, doc.conformedAt, doc.conformedOn)}</div>
       <div class="stat"><span class="label">Drift signal</span>${driftBadge(doc.driftSignal)}</div>
       <div class="stat"><span class="label">Implemented in</span>${implementedInHtml(doc.implementedIn)}</div>
       <div class="stat"><span class="label">Ratified by</span>${ratifiedByHtml(doc.ratifiedBy, doc.ratifiedOn)}</div>

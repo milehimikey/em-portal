@@ -50,7 +50,7 @@
     "marked": "^18.0.11"
   },
   "devDependencies": {
-    "@milehimikey/em": "file:vendor/milehimikey-em-1.8.1.tgz",
+    "@milehimikey/em": "file:vendor/milehimikey-em-1.21.0.tgz",
     "@types/node": "^22.0.0",
     "jsdom": "^26.1.0",
     "tsx": "^4.19.0",
