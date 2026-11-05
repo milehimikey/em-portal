@@ -75,6 +75,21 @@ const STYLE = `
   .invariant-list li { margin: .35rem 0; }
   table.field-table .col-type { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   table.field-table .col-notes, table.field-table .col-flag { color: #52606d; font-size: 13px; }
+  /* Client-side search (GH #3 item 3): header box + dropdown, styled here;
+     behavior lives in search.js at the site root. */
+  .search { position: relative; margin-left: auto; min-width: 220px; }
+  .search input { width: 100%; padding: .3rem .6rem; border-radius: 6px; border: 1px solid #52606d; background: #323f4b; color: #fff; font-size: 13px; }
+  .search input::placeholder { color: #9aa5b1; }
+  #portal-search-results { position: absolute; right: 0; top: calc(100% + 4px); width: min(480px, 90vw); max-height: 60vh; overflow-y: auto; background: #fff; color: #1f2933; border: 1px solid #cbd2d9; border-radius: 8px; box-shadow: 0 8px 24px rgba(31, 41, 51, .18); z-index: 10; }
+  .search-hit { display: flex; align-items: baseline; gap: .5rem; padding: .45rem .7rem; text-decoration: none; color: inherit; border-bottom: 1px solid #f0f2f5; }
+  .search-hit:last-child { border-bottom: none; }
+  .search-hit:hover, .search-hit.active { background: #f0f4ff; }
+  .search-hit-type { flex: 0 0 4.6rem; font-size: 11px; text-transform: uppercase; color: #7b8794; }
+  .search-hit-main { flex: 1 1 auto; min-width: 0; }
+  .search-hit-main strong { font-weight: 600; }
+  .search-hit-detail { display: block; font-size: 12px; color: #52606d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-hit-model { flex: 0 0 auto; font-size: 11px; color: #7b8794; }
+  .search-note { padding: .6rem .8rem; font-size: 13px; color: #52606d; }
 `;
 
 export interface Crumb {
@@ -91,6 +106,12 @@ export function layout(title: string, bodyHtml: string, homeHref: string, crumbs
   const crumbHtml = crumbs.length
     ? `<span class="crumbs">${crumbs.map((c) => `&rsaquo; <a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a>`).join(" ")}</span>`
     : "";
+  // The site-root prefix for root-level assets (search.js, the index it
+  // fetches), derived from homeHref — which every page already passes as
+  // its own relative path back to the root index ("index.html",
+  // "../index.html", ...). Same no-absolute-paths rule as homeHref itself.
+  const rootPrefix = homeHref.endsWith("index.html") ? homeHref.slice(0, -"index.html".length) : "";
+  const searchHtml = `<div class="search"><input id="portal-search" type="search" placeholder="Search slices, events, invariants&hellip;" autocomplete="off" /><div id="portal-search-results" hidden></div></div>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -100,7 +121,8 @@ export function layout(title: string, bodyHtml: string, homeHref: string, crumbs
   <style>${STYLE}</style>
 </head>
 <body>
-  <header><a href="${escapeHtml(homeHref)}">em portal</a>${crumbHtml}</header>
+  <header><a href="${escapeHtml(homeHref)}">em portal</a>${crumbHtml}${searchHtml}</header>
+  <script src="${escapeHtml(rootPrefix)}search.js" defer></script>
   <main>
 ${bodyHtml}
   </main>

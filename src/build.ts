@@ -30,6 +30,8 @@ import { checkStatusSchemaCompatible, StatusDoc } from "./em/statusDoc.js";
 import { checkSystemSchemaCompatible, SystemDoc } from "./em/systemDoc.js";
 import { linkExternalInvChips, rewriteSiblingDocLinks } from "./pages/components.js";
 import { listMdxFiles, renderMdxFile } from "./content.js";
+import { buildSearchIndex, SearchSource } from "./searchIndex.js";
+import { SEARCH_JS } from "./pages/searchClient.js";
 import { buildCrossModelLinks, CompiledModel } from "./crossModel.js";
 import { dedupe, kebabSlug } from "./slug.js";
 import { renderIndexPage } from "./pages/index.js";
@@ -136,6 +138,7 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
 
   const usedModelKeys = new Set<string>();
   const compiled: CompiledModel[] = [];
+  const searchSources: SearchSource[] = [];
   const modelSummaries: ModelSummary[] = [];
   const timing: BuildTiming[] = [];
   let sliceCount = 0;
@@ -272,6 +275,7 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
       slices: sliceSummaries,
     });
     compiled.push({ modelKey, file, doc });
+    searchSources.push({ modelKey, modelName: doc.model.name ?? modelKey, doc, docJson });
     timing.push({
       file,
       exportMs: tExportEnd - tExportStart,
@@ -326,6 +330,14 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
   };
   const indexHtml = renderIndexPage(statusDoc, summary);
   await writeFile(join(outDir, "index.html"), indexHtml, "utf8");
+
+  // GH #3 item 3: the client-side search — a static JSON index plus a
+  // dependency-free vanilla script, both at the site root. The client
+  // fetches the index lazily; over file:// that fetch fails and search
+  // degrades to an explanatory note (README's documented caveat) while
+  // every page keeps working straight off disk.
+  await writeFile(join(outDir, "search-index.json"), JSON.stringify({ entries: buildSearchIndex(searchSources) }, null, 2), "utf8");
+  await writeFile(join(outDir, "search.js"), SEARCH_JS, "utf8");
 
   const t1 = performance.now();
   return {
