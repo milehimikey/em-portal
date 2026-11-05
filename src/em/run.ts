@@ -84,6 +84,16 @@ export async function emExportJson(file: string): Promise<unknown> {
   return JSON.parse(stdout);
 }
 
+/** `em export <file> --doc-json --include-html` (GH #401, doc schema 1.0) —
+ *  the structured slice-doc export the component layer is driven by.
+ *  `--include-html` so each slice also carries em's section-aware HTML
+ *  render of its doc body (scenario cards, INV chips, field-table classes —
+ *  GH #402), which replaced the portal's own markdown re-parse. */
+export async function emExportDocJson(file: string): Promise<unknown> {
+  const { stdout } = await runEm(["export", file, "--doc-json", "--include-html"]);
+  return JSON.parse(stdout);
+}
+
 export interface EmStatusOptions {
   testsDir?: string;
   repo?: string;

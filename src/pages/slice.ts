@@ -8,6 +8,8 @@
 
 import { escapeHtml, layout } from "./html.js";
 import { EmElement, EmSlice, ShippedRecord, SliceDocJoin, SlicePattern } from "../em/exportDoc.js";
+import { DocFieldGroup, DocInvariant, DocInvariantCatalogEntry, DocOpenQuestion } from "../em/docJsonDoc.js";
+import { contractSection, invariantRow, openQuestionsStat } from "./components.js";
 import { elementDeepLink } from "../refs.js";
 
 const PATTERN_LABEL: Record<SlicePattern, string> = {
@@ -154,14 +156,21 @@ export interface SlicePageArgs {
   slice: EmSlice;
   pattern: SlicePattern;
   doc: SliceDocJoin;
-  /** Rendered markdown body of the bound doc (src/em/docBody.ts) — `em
-   *  export`'s own `doc` field never carries this (frontmatter only). `null`
-   *  when no doc is bound, the bound file couldn't be read, or it has no
-   *  body content after its frontmatter block. */
+  /** em's own section-aware HTML render of the bound doc's body (`em export
+   *  --doc-json --include-html`, GH #401/#402) — post-processed by build.ts
+   *  (sibling-link rewrite, external-chip cross-links) before it gets here.
+   *  `null` when no usable doc is bound. */
   docBodyHtml: string | null;
   /** Whether this model's directory holds a storyline canvas (GH #4) —
    *  gates the storyline chip's canvas link. */
   hasCanvas: boolean;
+  /** Structured sections from the doc-json export (GH #3 item 2) — the
+   *  component layer's inputs. */
+  fields: DocFieldGroup[];
+  invariants: DocInvariant[];
+  openQuestions: DocOpenQuestion[];
+  /** The model-level invariant catalog, for cross-slice "cited by" links. */
+  invariantCatalog: DocInvariantCatalogEntry[];
 }
 
 export function renderSlicePage(args: SlicePageArgs): string {
@@ -170,6 +179,15 @@ export function renderSlicePage(args: SlicePageArgs): string {
   const docSection = docBodyHtml
     ? `    <div class="doc">${docBodyHtml}</div>`
     : `    <p class="no-doc">${doc.found ? `Doc bound at <code>${escapeHtml(doc.path)}</code> but has no rendered body.` : `No slice doc bound. Expected at <code>${escapeHtml(doc.path)}</code>.`}</p>`;
+
+  // Component sections (GH #3 item 2), from --doc-json's structured data.
+  // The contract tables render only on a DOC-LESS slice: a documented
+  // slice's body already carries the same generated tables (em keeps them
+  // synced), and duplicating them here is exactly what the issue warns
+  // against. Invariants render always — the cross-slice "cited by" links
+  // are the portal's addition over the in-body render.
+  const contractHtml = docBodyHtml ? "" : contractSection(args.fields);
+  const invariantsHtml = invariantRow(args.invariants, args.invariantCatalog, slice.key, docBodyHtml !== null);
 
   // GH #4 item 4: where this slice sits in its story — the storyline name
   // from the export, linked to the canvas (the doc body's own generated
@@ -190,11 +208,11 @@ export function renderSlicePage(args: SlicePageArgs): string {
       <div class="stat"><span class="label">Drift signal</span>${driftBadge(doc.driftSignal)}</div>
       <div class="stat"><span class="label">Implemented in</span>${implementedInHtml(doc.implementedIn)}</div>
       <div class="stat"><span class="label">Ratified by</span>${ratifiedByHtml(doc.ratifiedBy, doc.ratifiedOn)}</div>
-    </div>
+${openQuestionsStat(args.openQuestions)}    </div>
 ${ownerTrackingHtml(doc.owner, doc.tracking)}    <div class="diagram-frame"><object class="diagram" type="image/svg+xml" data="${escapeHtml(sliceDiagramFile)}"></object></div>
     <p class="full-diagram-link"><a href="${escapeHtml(diagramFile)}">View full model diagram &rarr;</a></p>
-${renderElementsTable(slice.elements, args.modelKey)}
-${docSection}`;
+${invariantsHtml}${renderElementsTable(slice.elements, args.modelKey)}
+${contractHtml}${docSection}`;
 
   return layout(`${slice.name} — ${modelName}`, body, "../../index.html", [
     { label: modelName, href: ".." },
