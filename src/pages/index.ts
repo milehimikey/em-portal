@@ -50,7 +50,12 @@ function renderStatusSection(status: StatusDoc): string {
     .map(
       (c) => `<tr>
         <td><code>${escapeHtml(c.file)}</code></td>
-        <td>${c.hasStateFile && c.lastConformance ? escapeHtml(`${c.lastConformance.revision} (${c.lastConformance.date})`) + (c.lastConformance.partial ? ` <span class="badge warn">partial</span>` : "") : "&mdash;"}</td>
+        <td>${
+          c.hasStateFile && c.lastConformance
+            ? `<code title="${escapeHtml(c.lastConformance.revision)}">${escapeHtml(/^[0-9a-f]{40}$/i.test(c.lastConformance.revision) ? c.lastConformance.revision.slice(0, 7) : c.lastConformance.revision)}</code> (${escapeHtml(c.lastConformance.date)})` +
+              (c.lastConformance.partial ? ` <span class="badge warn">partial</span>` : "")
+            : "&mdash;"
+        }</td>
         <td>${c.commitsBehindHead ?? "&mdash;"}</td>
         <td>${c.slicePRsBehindHead ?? "&mdash;"}</td>
         <td>${c.unruledFindings == null ? "&mdash;" : c.unruledFindings > 0 ? `<span class="badge warn">${c.unruledFindings}</span>` : "0"}</td>
