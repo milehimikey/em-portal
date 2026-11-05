@@ -50,7 +50,7 @@ slice "View Open Orders" {
     total: Money
     status: string
   }
-  ui Order List @Customer
+  ui Order List @Customer issue "status has no event source yet — nothing records a transition"
 }
 
 slice "Checkout" {

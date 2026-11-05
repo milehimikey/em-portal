@@ -263,6 +263,37 @@ describe("buildPortal — component layer + MDX content (GH #3 item 2)", () => {
     expect(other).not.toContain("owns the buying journey");
   });
 
+  it("writes a search index covering slices, elements, invariants, and open issues (GH #3 item 3)", async () => {
+    const raw = await readFile(join(outDir, "search-index.json"), "utf8");
+    const { entries } = JSON.parse(raw) as { entries: Array<{ type: string; title: string; href: string }> };
+    const types = new Set(entries.map((e) => e.type));
+    expect(types).toContain("slice");
+    expect(types).toContain("command");
+    expect(types).toContain("event");
+    expect(types).toContain("view");
+    expect(types).toContain("invariant");
+    expect(types).toContain("issue");
+    // Invariant hits land on em's definition anchor in the owning slice.
+    const inv = entries.find((e) => e.type === "invariant" && e.title === "INV-FUL-1")!;
+    expect(inv.href).toBe("fulfillment/slices/receive-order.html#inv-inv-ful-1");
+    // Element hits use the portal's deep-link scheme (refs.ts).
+    const event = entries.find((e) => e.type === "event" && e.title === "Order Submitted")!;
+    expect(event.href).toMatch(/^checkout\/slices\/checkout\.html#checkout\/event\./);
+    // The fixture's one open issue is findable by its text.
+    expect(entries.some((e) => e.type === "issue" && e.title.includes("status has no event source"))).toBe(true);
+  });
+
+  it("ships the search client and wires the box into every page at the right depth", async () => {
+    expect(existsSync(join(outDir, "search.js"))).toBe(true);
+    const landing = await readFile(join(outDir, "index.html"), "utf8");
+    expect(landing).toContain('id="portal-search"');
+    expect(landing).toContain('<script src="search.js" defer>');
+    const slicePage = await readFile(join(outDir, "fulfillment", "slices", "receive-order.html"), "utf8");
+    expect(slicePage).toContain('<script src="../../search.js" defer>');
+    const modelPage = await readFile(join(outDir, "fulfillment", "index.html"), "utf8");
+    expect(modelPage).toContain('<script src="../search.js" defer>');
+  });
+
   it("warns about a content file matching no model key instead of silently skipping it", async () => {
     const tmpContent = await mkdtemp(join(tmpdir(), "em-portal-content-typo-"));
     const tmpOut = await mkdtemp(join(tmpdir(), "em-portal-content-typo-out-"));

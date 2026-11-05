@@ -28,6 +28,8 @@ npx em-portal build models/*/*.em -o site
 ```
 site/
   index.html                 # landing page: em status rollup (state up front) + system map + "First read"
+  search-index.json          # build-time search index (slices, invariants, elements, issues)
+  search.js                  # dependency-free search client (needs a static host; see Search)
   <model-key>/
     index.html                # model page: storylines (if any) + diagram + slice table
     walkthrough.html          # guided first read (0.2.0): teaches the notation on THIS model
@@ -40,8 +42,8 @@ site/
       <slice-key>.svg
 ```
 
-Open `site/index.html` directly (`file://` works, no server needed) or serve the directory with
-anything that serves static files.
+Open `site/index.html` directly (`file://` works, no server needed — except the search box,
+see [Search](#search)) or serve the directory with anything that serves static files.
 
 ### CLI
 
@@ -65,6 +67,21 @@ Options:
                        HTML at build time: index.mdx = landing narrative,
                        <model-key>.mdx = that model's intro
 ```
+
+### Search
+
+Every page's header has a search box over a **build-time static index** (`search-index.json`
+at the site root): slices, invariants (`INV-*` id → rule → owning slice, landing on the
+definition anchor), events/commands/read-models (via the same deep-link scheme as every
+other portal link), and open issues. The client (`search.js`) is dependency-free vanilla
+JS — no backend, no search library; the index is fetched lazily on first use, so browsing
+costs nothing until someone searches.
+
+**The one `file://` caveat:** browsers refuse `fetch` of sibling files from a `file://`
+origin, so the search *index can't load* when the site is opened straight off disk — the
+box degrades to a note saying exactly that. Search works on any static host (GitHub Pages,
+a bucket, `python3 -m http.server`); direct-file browsing stays fully supported for
+everything else.
 
 ### Hand-authored content (MDX — site-layer only)
 
