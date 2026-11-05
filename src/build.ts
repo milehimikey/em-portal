@@ -85,12 +85,22 @@ export interface BuildResult {
  *  keeps em's deep-link scheme working (GH #4 item 4) by retargeting every
  *  `.../slices/<key>.md` href whose key is a known slice to
  *  `<prefix><key>.html`. Unknown keys (another model's doc, a `notes/*.md`
- *  element note) are left alone rather than rewritten into 404s. */
+ *  element note) are left alone rather than rewritten into 404s.
+ *
+ *  Rewritten links also gain `target="_top"` (on the plain `href` attribute
+ *  only — each anchor carries exactly one, beside its `xlink:href` twin):
+ *  the model/slice pages embed these SVGs via `<object>`, and without a
+ *  target a click navigates the object's own nested browsing context — the
+ *  slice page renders inside the little diagram frame instead of the tab.
+ *  Harmless everywhere else (direct SVG navigation, the canvas page). */
 export function rewriteSliceDocLinks(content: string, sliceKeys: ReadonlySet<string>, prefix: string): string {
   return content.replace(
     /((?:xlink:)?href=")([^"]*?)slices\/([a-z0-9][a-z0-9-]*)\.md(")/g,
-    (match, attr: string, _lead: string, key: string, close: string) =>
-      sliceKeys.has(key) ? `${attr}${prefix}${key}.html${close}` : match,
+    (match, attr: string, _lead: string, key: string, close: string) => {
+      if (!sliceKeys.has(key)) return match;
+      const target = attr === 'href="' ? 'target="_top" ' : "";
+      return `${target}${attr}${prefix}${key}.html${close}`;
+    },
   );
 }
 

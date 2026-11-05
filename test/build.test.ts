@@ -222,6 +222,11 @@ describe("buildPortal — storyline canvas and system map (GH #4)", () => {
     expect(diagram).not.toMatch(/href="[^"]*slices\/checkout\.md"/);
     const sliceSvg = await readFile(join(outDir, "order-fulfillment", "slices", "checkout.svg"), "utf8");
     expect(sliceSvg).toContain('href="checkout.html"');
+    // target="_top": these SVGs are <object>-embedded on model/slice pages,
+    // where an untargeted click would navigate the object's own nested
+    // context — the slice page inside the diagram frame — not the tab.
+    expect(diagram).toContain('target="_top" href="slices/checkout.html"');
+    expect(sliceSvg).toContain('target="_top" href="checkout.html"');
   });
 });
 
