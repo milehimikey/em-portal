@@ -14,9 +14,10 @@ front and a way to navigate a system of several models, not a flat per-model sit
 
 ## Status
 
-**0.2.0 — read-only multi-model browser + guided first read.** See
-[What 0.1.0 includes](#what-01-includes) and [What 0.2.0 adds](#what-020-adds-the-guided-first-read)
-below.
+**0.3.0 — consumable models: storyline canvases, system map, component layer, MDX content,
+search.** Builds on em 1.21.0 (export schema 1.20, status 1.12, doc-json 1.0). See
+[What 0.1.0 includes](#what-01-includes), [What 0.2.0 adds](#what-020-adds-the-guided-first-read),
+and [What 0.3.0 adds](#what-030-adds-consumable-models) below.
 
 ## Quickstart
 
@@ -215,6 +216,29 @@ still read-only otherwise.
 - Any client-side JS beyond the walkthrough's own stepper (search, filtering, sort across the
   slice table) — every other page is still plain static HTML, same posture as `em catalog`.
 
+## What 0.3.0 adds: consumable models
+
+The em 1.21.0 line (GH #3/#4 in this repo; em's "consumable models" milestone upstream),
+landed as four pieces:
+
+- **Storyline canvas per model + system map** (GH #4): a model that declares storylines gets
+  em's own `em render --map` canvas under `<model-key>/storylines/`, the model page leads
+  with the storyline list, and the landing page draws `em system`'s context map (models as
+  nodes, `consumes` seams as edges, nodes linking to canvases). em's baked-in slice-doc
+  links in every SVG are retargeted to the portal's own pages.
+- **Component layer** (GH #3 item 2): slice pages are driven by `em export --doc-json` —
+  em's section-aware body render (scenario cards, INV chips, field tables) styled by the
+  portal and exceeded with the invariant catalog's cross-slice links; model pages gain an
+  invariant catalog; doc-less slices gain a Contract section. The portal no longer parses
+  markdown at all.
+- **MDX content layer** (GH #3 item 2): `--content <dir>` compiles hand-authored
+  `index.mdx`/`<model-key>.mdx` to static HTML at build time — site-layer only, slice docs
+  stay plain markdown.
+- **Client-side search** (GH #3 item 3): a build-time static index over slices, invariants,
+  elements, and open issues, with a dependency-free vanilla client in every page's header.
+- **Lifecycle facts from em 1.15+** (GH #3 item 1): shipped records, certification state,
+  uncertified drift, unruled findings — the landing page's headline stat is shipped/total.
+
 ## What 0.2.0 adds: the guided first read
 
 **MIL-174.** A first-time, non-technical reader clicks "First read" — prominent on the landing
@@ -262,10 +286,11 @@ honestly instead: a color-keyed callout card (kind + name + a same-page link to 
 styled to match the diagram's own kind/marker colors, so it reads as the same visual language
 rather than a second one.
 
-## CI publish recipe
+## GitHub Pages recipe
 
-A downstream project (one that actually has `.em` models) publishes the portal from CI like
-this — build, then hand the output directory to whichever static-hosting deploy action you use:
+A downstream project (one that actually has `.em` models) publishes the portal to GitHub
+Pages like this. Copy it as `.github/workflows/portal.yml`, enable **Settings → Pages →
+Source: GitHub Actions** once, and every push to main rebuilds and deploys:
 
 ```yaml
 # .github/workflows/portal.yml
@@ -273,28 +298,60 @@ name: em-portal
 on:
   push:
     branches: [main]
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — `em status` computes commits-behind-HEAD from it
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm ci
-      - run: npx em-portal build models/*/*.em -o site
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci # installs @milehimikey/em + @milehimikey/em-portal (see Quickstart)
+      # --tests wires invariant coverage onto the landing page; --repo makes
+      # the freshness table diff against this checkout. Drop either if your
+      # repo doesn't have the corresponding thing yet.
+      - run: npx em-portal build models/*/*.em -o site --tests tests --repo .
       - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
-      - uses: actions/deploy-pages@v4
+        with:
+          path: site/
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 ```
 
-This repo's own [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm test` (which
-builds the portal against the fixture models under `test/fixtures/`) on every push — the build
-half of the recipe above, exercised continuously; the deploy half needs a real target repo with
-real models, which this package intentionally isn't.
+**Base path:** a Pages *project* site serves under `/<repo-name>/`, not `/`. No build option
+is needed for that: every link and asset reference the portal emits is **relative** (the same
+no-absolute-paths rule that makes `file://` work — see `src/pages/html.ts`), so the site is
+base-path-agnostic by construction. Search included: `search.js` derives the site root from
+its own script tag's URL.
+
+Any other static host (an S3/GCS bucket, Netlify, `rsync` to a box) is the same shape: run
+the build, publish the output directory. Nothing in `site/` is host-specific.
+
+This repo's own [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the typechecks
+and tests AND builds the example multi-model site from the fixture models on every PR
+(uploaded as a workflow artifact) — the build half of the recipe above, exercised
+continuously; the deploy half needs a real target repo with real models, which this package
+intentionally isn't.
 
 ## Test fixtures
 

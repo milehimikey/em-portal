@@ -15,4 +15,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npx tsc -p tsconfig.test.json --noEmit
       - run: npm test
+      # GH #3 item 5: build the example multi-model site on every PR so a
+      # rendering regression is visible as a build failure (and the output
+      # is downloadable for eyeballing). em's Graphviz is WASM, in-process —
+      # no system packages needed.
+      - run: >
+          npx tsx src/cli.ts build
+          test/fixtures/multi-model/models/checkout/checkout.em
+          test/fixtures/multi-model/models/fulfillment/fulfillment.em
+          test/fixtures/order-fulfillment/order-fulfillment.em
+          -o example-site
+          --title "em-portal example"
+          --content test/fixtures/multi-model/content
+      - uses: actions/upload-artifact@v4
+        with:
+          name: example-site
+          path: example-site/
+          retention-days: 14
