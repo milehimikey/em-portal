@@ -137,9 +137,35 @@ export interface EmSlice {
   index: number;
   line: number;
   source: string | null;
+  /** The `storyline` block this slice is declared in (GH #277, schema 1.19),
+   *  or null for a slice outside every storyline. */
+  storyline: string | null;
   elements: EmElement[];
   pattern: SlicePattern;
   doc: SliceDocJoin;
+}
+
+/** One `storyline` block (GH #277, schema 1.19) — a named chapter over a run
+ *  of slices. `after` names the storyline this one is declared to follow. */
+export interface EmStoryline {
+  name: string;
+  source: string | null;
+  after: string | null;
+  sliceKeys: string[];
+  /** GH #421 (schema 1.20): the storyline model file holding this storyline's
+   *  slices, posix and relative to the root model's directory; null inline. */
+  file: string | null;
+}
+
+/** The flow between storylines (schema 1.20): a declared `after` (no
+ *  elements) or elements of one storyline feeding another ("reads", with the
+ *  crossing source elements). This is exactly what `em render --map` draws
+ *  as the connectors between canvas frames. */
+export interface EmStorylineEdge {
+  from: string;
+  to: string;
+  kind: "after" | "reads";
+  elements: { name: string; ref: string }[];
 }
 
 export interface EmArrow {
@@ -158,11 +184,18 @@ export interface EmNamedType {
 
 export interface EmModel {
   name: string | null;
+  /** The model's own cross-model key (MIL-193, schema 1.14+) — em's
+   *  `computeModelKey()`, the same key `em system`'s contextMap nodes carry.
+   *  The join point between a portal model directory and the system map. */
+  key: string;
   personas: string[];
   contexts: string[];
   hasAutomation: boolean;
   types: EmNamedType[];
   slices: EmSlice[];
+  /** Storyline blocks in document order (empty for a model without them). */
+  storylines: EmStoryline[];
+  storylineEdges: EmStorylineEdge[];
   arrows: EmArrow[];
 }
 

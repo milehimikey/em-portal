@@ -1,0 +1,12 @@
+# System manifest (schema 2.0) for the multi-model fixture — gives the portal
+# build a system map to render on its landing page: two models, one verified
+# `consumes` seam (fulfillment's Order Intake reading checkout's public
+# Order Submitted event). Found by build.ts's nearest-system.yaml walk-up
+# from the first model file, the same discovery `em status` uses.
+systemSchemaVersion: "2.0"
+name: Portal fixture system
+models:
+  checkout:
+    source: models/checkout/checkout.em
+  fulfillment:
+    source: models/fulfillment/fulfillment.em

@@ -22,6 +22,18 @@ function stripFrontmatter(markdown: string): string {
   return lines.slice(closeIndex + 1).join("\n");
 }
 
+/** Rewrites sibling-doc links in a rendered doc body to the portal's own
+ *  slice pages. em's generated `em-slice-story` line (GH #418, right under
+ *  the doc's `![Diagram]` line) links the previous/next step as
+ *  `[Name](./other-slice.md)` — a sibling file in the same `slices/`
+ *  directory. The portal serves that sibling as `other-slice.html` in the
+ *  same output directory, so only the extension changes. Conservative on
+ *  purpose: just bare/`./`-relative kebab-case `.md` hrefs — an absolute
+ *  URL or a path with directories is somebody else's link. */
+function rewriteSiblingDocLinks(html: string): string {
+  return html.replace(/(href=")(?:\.\/)?([a-z0-9][a-z0-9-]*)\.md(")/g, "$1./$2.html$3");
+}
+
 /** Returns rendered HTML for the slice doc bound at `docRelPath` (relative to
  *  `modelFile`'s own directory), or `null` if the file can't be read — a
  *  routine, non-fatal state (no doc bound, or a stale `path` from a `found:
@@ -36,5 +48,5 @@ export function renderDocBody(modelFile: string, docRelPath: string): string | n
   }
   const body = stripFrontmatter(raw).trim();
   if (!body) return null;
-  return marked.parse(body, { async: false }) as string;
+  return rewriteSiblingDocLinks(marked.parse(body, { async: false }) as string);
 }

@@ -4,11 +4,14 @@
 // them, the cross-model link heuristic, then every page written to disk.
 //
 //   <outDir>/
-//     index.html                 landing page: em status rollup + model index
+//     index.html                 landing page: em status rollup + system map + model index
 //     <model-key>/
-//       index.html                model page: diagram + slice table
+//       index.html                model page: storylines (if any) + diagram + slice table
 //       walkthrough.html          guided first read (MIL-174) over this model
 //       diagram.svg
+//       storylines/               only when the model declares storylines (GH #4)
+//         map.html                 em's own canvas (`em render --map`) — one canvas
+//         <storyline>.svg          implementation, em's page, never a portal re-implementation
 //       slices/
 //         <slice-key>.html        slice page: diagram, doc, driftSignal, PR link
 //         <slice-key>.svg
@@ -17,12 +20,14 @@
 // convention) so slice keys from different models can never collide, even
 // without a cross-file dedupe pass.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
-import { emExportJson, emRenderModel, emRenderSlice, emStatusJson } from "./em/run.js";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import { emExportJson, emRenderModel, emRenderSlice, emRenderStorylineMap, emStatusJson, emSystemJson } from "./em/run.js";
 import { checkExportSchemaCompatible, ExportDoc } from "./em/exportDoc.js";
 import { renderDocBody } from "./em/docBody.js";
 import { checkStatusSchemaCompatible, StatusDoc } from "./em/statusDoc.js";
+import { checkSystemSchemaCompatible, SystemDoc } from "./em/systemDoc.js";
 import { buildCrossModelLinks, CompiledModel } from "./crossModel.js";
 import { dedupe, kebabSlug } from "./slug.js";
 import { renderIndexPage } from "./pages/index.js";
@@ -37,6 +42,12 @@ export interface BuildOptions {
   title?: string;
   testsDir?: string;
   repo?: string;
+  /** Path to a `system.yaml` manifest for the landing page's system map.
+   *  When omitted, the nearest `system.yaml` above the first model file is
+   *  used (same walk-up `em status` does: stop after the repo root — the
+   *  first directory holding `.git` — or the filesystem root); when none is
+   *  found, the landing page simply has no system map. */
+  system?: string;
 }
 
 export interface BuildTiming {
@@ -53,6 +64,47 @@ export interface BuildResult {
   timing: BuildTiming[];
   statusTimingMs: number;
   totalMs: number;
+}
+
+/** Rewrites the slice-doc links em bakes into every rendered artifact (full
+ *  diagram, slice/storyline SVGs, the canvas map.html) to the portal's own
+ *  slice pages. em wraps each slice header in an `<a>` to its design doc —
+ *  `slices/<key>.md` resolved RELATIVE TO THE SOURCE MODEL, so in a portal
+ *  build the href climbs back into the source tree (`../../src/.../slices/
+ *  checkout.md`): dead on any deployed site, and pointing at markdown even
+ *  where it resolves. The portal serves those same slices as pages, so this
+ *  keeps em's deep-link scheme working (GH #4 item 4) by retargeting every
+ *  `.../slices/<key>.md` href whose key is a known slice to
+ *  `<prefix><key>.html`. Unknown keys (another model's doc, a `notes/*.md`
+ *  element note) are left alone rather than rewritten into 404s. */
+export function rewriteSliceDocLinks(content: string, sliceKeys: ReadonlySet<string>, prefix: string): string {
+  return content.replace(
+    /((?:xlink:)?href=")([^"]*?)slices\/([a-z0-9][a-z0-9-]*)\.md(")/g,
+    (match, attr: string, _lead: string, key: string, close: string) =>
+      sliceKeys.has(key) ? `${attr}${prefix}${key}.html${close}` : match,
+  );
+}
+
+/** The nearest `system.yaml` walking up from `file`'s own directory — the
+ *  same stop conditions as em's own findSystemManifestAbove (cli/
+ *  systemInputs.ts): give up after the repo root (the first directory
+ *  holding `.git`) or at the filesystem root. */
+function findSystemManifestAbove(file: string): string | null {
+  let dir = resolve(dirname(file));
+  for (;;) {
+    const candidate = join(dir, "system.yaml");
+    if (existsSync(candidate)) return candidate;
+    if (existsSync(join(dir, ".git"))) return null;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/** Reads, rewrites (rewriteSliceDocLinks), and writes back one rendered file. */
+async function retargetFile(path: string, sliceKeys: ReadonlySet<string>, prefix: string): Promise<void> {
+  const content = await readFile(path, "utf8");
+  await writeFile(path, rewriteSliceDocLinks(content, sliceKeys, prefix), "utf8");
 }
 
 export async function buildPortal(files: string[], opts: BuildOptions): Promise<BuildResult> {
@@ -84,14 +136,32 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
     const slicesDir = join(modelDir, "slices");
     await mkdir(slicesDir, { recursive: true });
 
+    const sliceKeys: ReadonlySet<string> = new Set(doc.model.slices.map((s) => s.key));
+
     const tRenderStart = performance.now();
     const diagramFile = "diagram.svg";
     await emRenderModel(file, join(modelDir, diagramFile));
+    await retargetFile(join(modelDir, diagramFile), sliceKeys, "slices/");
+
+    // GH #4: the storyline canvas — em's own `em render --map` page, copied
+    // as-is (one canvas implementation, em's, never a portal re-render).
+    // `--map` refuses on a model with no storylines, so gate on the export.
+    const hasCanvas = doc.model.storylines.length > 0;
+    if (hasCanvas) {
+      const storylinesDir = join(modelDir, "storylines");
+      await emRenderStorylineMap(file, join(storylinesDir, "map.html"));
+      for (const entry of await readdir(storylinesDir)) {
+        if (entry.endsWith(".svg") || entry === "map.html") {
+          await retargetFile(join(storylinesDir, entry), sliceKeys, "../slices/");
+        }
+      }
+    }
 
     const sliceSummaries: SliceSummary[] = [];
     for (const slice of doc.model.slices) {
       const sliceDiagramFile = `${slice.key}.svg`;
       await emRenderSlice(file, slice.name, join(slicesDir, sliceDiagramFile));
+      await retargetFile(join(slicesDir, sliceDiagramFile), sliceKeys, "");
 
       const page = renderSlicePage({
         modelName: doc.model.name ?? modelKey,
@@ -102,6 +172,7 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
         pattern: slice.pattern,
         doc: slice.doc,
         docBodyHtml: renderDocBody(file, slice.doc.path),
+        hasCanvas,
       });
       await writeFile(join(slicesDir, `${slice.key}.html`), page, "utf8");
 
@@ -123,6 +194,8 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
       file,
       diagramFile,
       slices: sliceSummaries,
+      storylines: doc.model.storylines,
+      storylineEdges: doc.model.storylineEdges,
     });
     await writeFile(join(modelDir, "index.html"), modelPage, "utf8");
 
@@ -141,8 +214,13 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
     modelSummaries.push({
       key: modelKey,
       name: doc.model.name ?? modelKey,
+      // em's own cross-model key (MIL-193) — the join point against `em
+      // system`'s contextMap nodes; usually equal to the portal's directory
+      // key, but the portal's dedupe (`~2`) can make them differ.
+      emKey: doc.model.key,
       file,
       sliceCount: doc.model.slices.length,
+      hasCanvas,
       slices: sliceSummaries,
     });
     compiled.push({ modelKey, file, doc });
@@ -161,10 +239,33 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
 
   const crossModelLinks = buildCrossModelLinks(compiled);
 
+  // GH #4 item 3: the system map. `em system --json`'s contextMap is "the
+  // org-level view em-portal renders" (docs/cli.md) — models as nodes,
+  // `consumes` seams as edges. A seam that fails verification makes em
+  // system exit 1 but still carries the full document (emSystemJson
+  // tolerates that), so a broken seam never silently drops off the map OR
+  // kills the build.
+  let systemMap: SystemDoc["contextMap"] | null = null;
+  const manifestPath = opts.system ?? findSystemManifestAbove(files[0]);
+  if (manifestPath) {
+    try {
+      const systemDoc = (await emSystemJson(manifestPath)) as SystemDoc;
+      const systemWarning = checkSystemSchemaCompatible(systemDoc);
+      if (systemWarning) warnings.push(systemWarning);
+      systemMap = systemDoc.contextMap;
+    } catch (err) {
+      // A manifest that refuses (unreadable, invalid, a source with compile
+      // errors) costs the landing page its system map, nothing more — the
+      // per-model pages are built from exports that already compiled.
+      warnings.push(`em system ${manifestPath} failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   const summary: PortalSummary = {
     title: opts.title ?? "em portal",
     models: modelSummaries,
     crossModelLinks,
+    systemMap,
   };
   const indexHtml = renderIndexPage(statusDoc, summary);
   await writeFile(join(outDir, "index.html"), indexHtml, "utf8");
