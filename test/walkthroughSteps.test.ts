@@ -25,13 +25,17 @@ function makeDoc(overrides: Partial<SliceDocJoin> = {}): SliceDocJoin {
     version: null,
     implementedIn: null,
     splitFrom: null,
-    mergedFrom: null,
-    supersededBy: null,
+    mergedFrom: [],
+    supersededBy: [],
     driftSignal: null,
     ratifiedBy: null,
     ratifiedOn: null,
+    shipped: null,
     owner: null,
     tracking: null,
+    conformedVersion: null,
+    conformedAt: null,
+    conformedOn: null,
     ...overrides,
   };
 }
@@ -61,6 +65,7 @@ function makeSlice(overrides: Partial<EmSlice> & { key: string; name: string; in
   return {
     line: overrides.index + 1,
     source: null,
+    storyline: null,
     elements: [],
     pattern: "unclassified",
     doc: makeDoc(),
@@ -71,11 +76,14 @@ function makeSlice(overrides: Partial<EmSlice> & { key: string; name: string; in
 function makeModel(overrides: Partial<EmModel> = {}): EmModel {
   return {
     name: "Test Model",
+    key: "test-model",
     personas: ["Customer"],
     contexts: ["Order"],
     hasAutomation: false,
     types: [],
     slices: [],
+    storylines: [],
+    storylineEdges: [],
     arrows: [],
     ...overrides,
   };

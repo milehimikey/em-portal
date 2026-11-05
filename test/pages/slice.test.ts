@@ -44,6 +44,7 @@ function makeSlice(doc: SliceDocJoin): EmSlice {
     index: 0,
     line: 1,
     source: null,
+    storyline: null,
     pattern: "state-change",
     doc,
     elements: [
@@ -80,6 +81,7 @@ function render(doc: SliceDocJoin): string {
     pattern: slice.pattern,
     doc,
     docBodyHtml: "<p>body</p>",
+    hasCanvas: false,
   });
 }
 

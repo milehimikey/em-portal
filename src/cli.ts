@@ -19,13 +19,18 @@ program
   .option("--title <title>", "Site title shown on the landing page", "em portal")
   .option("--tests <dir>", "Directory to scan for INV-* test citations (enables invariant coverage on the landing page)")
   .option("--repo <path>", "Git repo to compute commits-behind-HEAD in (default: each model's own directory)")
-  .action(async (models: string[], options: { out: string; title: string; tests?: string; repo?: string }) => {
+  .option(
+    "--system <manifest>",
+    "system.yaml manifest for the landing page's system map (default: the nearest system.yaml above the first model file)",
+  )
+  .action(async (models: string[], options: { out: string; title: string; tests?: string; repo?: string; system?: string }) => {
     try {
       const result = await buildPortal(models, {
         outDir: options.out,
         title: options.title,
         testsDir: options.tests,
         repo: options.repo,
+        system: options.system,
       });
       for (const w of result.warnings) console.warn(`warning: ${w}`);
       console.log(

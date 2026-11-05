@@ -27,11 +27,14 @@ npx em-portal build models/*/*.em -o site
 
 ```
 site/
-  index.html                 # landing page: em status rollup (state up front) + "First read" entry point
+  index.html                 # landing page: em status rollup (state up front) + system map + "First read"
   <model-key>/
-    index.html                # model page: diagram + slice table
+    index.html                # model page: storylines (if any) + diagram + slice table
     walkthrough.html          # guided first read (0.2.0): teaches the notation on THIS model
     diagram.svg
+    storylines/               # only when the model declares storyline blocks
+      map.html                 # em's own storyline canvas (`em render --map`), copied as-is
+      <storyline>.svg          # each storyline's own diagram
     slices/
       <slice-key>.html         # slice page: diagram, doc, driftSignal, PR link
       <slice-key>.svg
@@ -55,6 +58,9 @@ Options:
                        coverage on the landing page — forwarded to `em status --tests`)
   --repo <path>       Git repo to compute commits-behind-HEAD in (forwarded to
                        `em status --repo`; default: each model's own directory)
+  --system <manifest> system.yaml for the landing page's system map (default: the
+                       nearest system.yaml above the first model file, the same
+                       walk-up `em status` uses; none found = no system map)
 ```
 
 Multiple models in one invocation is how a multi-model system's cross-model index and

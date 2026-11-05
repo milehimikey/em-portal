@@ -109,3 +109,34 @@ export async function emRenderModel(file: string, outPath: string): Promise<void
 export async function emRenderSlice(file: string, sliceName: string, outPath: string): Promise<void> {
   await runEm(["render", file, "--slice", sliceName, "-o", outPath]);
 }
+
+/** `em render <file> --map -o <outHtmlPath>` — the storyline canvas (em
+ *  1.21.0, GH #421): writes the self-contained `map.html` at `outHtmlPath`
+ *  AND every storyline's own SVG (`<kebab-slug>.svg`) beside it in the same
+ *  directory. Refuses (non-zero exit) on a model with no storylines — the
+ *  caller gates on `model.storylines.length`, never on catching that. */
+export async function emRenderStorylineMap(file: string, outHtmlPath: string): Promise<void> {
+  await runEm(["render", file, "--map", "-o", outHtmlPath]);
+}
+
+/** `em system <manifestOrDir> --json` (systemSchemaVersion 2.0). em system
+ *  exits 1 when any seam binding fails verification but STILL prints the
+ *  full document (docs/cli.md: "a CI job always has the document to act
+ *  on") — so a failing seam must not kill a portal build. If the process
+ *  exits non-zero but stdout parses as JSON, that document is returned;
+ *  only a real refusal (no document) throws. */
+export async function emSystemJson(manifestOrDir: string): Promise<unknown> {
+  try {
+    const { stdout } = await runEm(["system", manifestOrDir, "--json"]);
+    return JSON.parse(stdout);
+  } catch (err) {
+    if (err instanceof EmCliError && err.stdout.trim()) {
+      try {
+        return JSON.parse(err.stdout);
+      } catch {
+        throw err;
+      }
+    }
+    throw err;
+  }
+}

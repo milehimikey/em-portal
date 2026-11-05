@@ -159,6 +159,9 @@ export interface SlicePageArgs {
    *  when no doc is bound, the bound file couldn't be read, or it has no
    *  body content after its frontmatter block. */
   docBodyHtml: string | null;
+  /** Whether this model's directory holds a storyline canvas (GH #4) —
+   *  gates the storyline chip's canvas link. */
+  hasCanvas: boolean;
 }
 
 export function renderSlicePage(args: SlicePageArgs): string {
@@ -168,8 +171,18 @@ export function renderSlicePage(args: SlicePageArgs): string {
     ? `    <div class="doc">${docBodyHtml}</div>`
     : `    <p class="no-doc">${doc.found ? `Doc bound at <code>${escapeHtml(doc.path)}</code> but has no rendered body.` : `No slice doc bound. Expected at <code>${escapeHtml(doc.path)}</code>.`}</p>`;
 
+  // GH #4 item 4: where this slice sits in its story — the storyline name
+  // from the export, linked to the canvas (the doc body's own generated
+  // em-slice-story line below carries the step-by-step detail).
+  const storylineChip =
+    args.slice.storyline && args.hasCanvas
+      ? ` &middot; in <a href="../storylines/map.html">${escapeHtml(args.slice.storyline)}</a>`
+      : args.slice.storyline
+        ? ` &middot; in ${escapeHtml(args.slice.storyline)}`
+        : "";
+
   const body = `    <h1>${escapeHtml(slice.name)}</h1>
-    <p class="pattern">${escapeHtml(PATTERN_LABEL[pattern])}</p>
+    <p class="pattern">${escapeHtml(PATTERN_LABEL[pattern])}${storylineChip}</p>
     <div class="stat-row">
       <div class="stat"><span class="label">Status</span>${statusBadge(doc.status)}</div>
       <div class="stat"><span class="label">Shipped</span>${shippedHtml(doc.shipped)}</div>

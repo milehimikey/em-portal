@@ -120,6 +120,75 @@ describe("buildPortal", () => {
   });
 });
 
+describe("buildPortal — storyline canvas and system map (GH #4)", () => {
+  let outDir: string;
+
+  beforeAll(async () => {
+    outDir = await mkdtemp(join(tmpdir(), "em-portal-storyline-test-"));
+    // Multi-model fixture FIRST: the system.yaml walk-up starts from the
+    // first input, and fixtures/multi-model/system.yaml is what gives the
+    // landing page its system map. order-fulfillment rides along as the
+    // model WITHOUT storylines.
+    await buildPortal([CHECKOUT, FULFILLMENT, ORDER_FULFILLMENT], { outDir, title: "Storyline Test Portal" });
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  it("renders em's storyline canvas (map.html + one SVG per storyline) for each model with storylines", async () => {
+    expect(existsSync(join(outDir, "checkout", "storylines", "map.html"))).toBe(true);
+    expect(existsSync(join(outDir, "checkout", "storylines", "buy-something.svg"))).toBe(true);
+    expect(existsSync(join(outDir, "fulfillment", "storylines", "map.html"))).toBe(true);
+    expect(existsSync(join(outDir, "fulfillment", "storylines", "fulfil-an-order.svg"))).toBe(true);
+    expect(existsSync(join(outDir, "fulfillment", "storylines", "handle-a-return.svg"))).toBe(true);
+  });
+
+  it("writes no storylines directory for a model without storyline blocks", async () => {
+    expect(existsSync(join(outDir, "order-fulfillment", "storylines"))).toBe(false);
+  });
+
+  it("leads the model page with the storyline list and canvas link instead of the full diagram", async () => {
+    const html = await readFile(join(outDir, "fulfillment", "index.html"), "utf8");
+    expect(html).toContain("Storylines");
+    expect(html).toContain('href="storylines/map.html"');
+    expect(html).toContain('href="storylines/fulfil-an-order.svg"');
+    expect(html).toContain("after Fulfil an order");
+    // Storylines section comes BEFORE the demoted full-diagram embed.
+    expect(html.indexOf("storylines/map.html")).toBeLessThan(html.indexOf('data="diagram.svg"'));
+  });
+
+  it("keeps the diagram-first layout for a model without storylines", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "index.html"), "utf8");
+    expect(html).not.toContain("Storylines");
+    expect(html).toContain('data="diagram.svg"');
+  });
+
+  it("renders the system map from em system's contextMap on the landing page", async () => {
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain("System map");
+    expect(html).toContain("1 seam");
+    // Both nodes link to their model's storyline canvas.
+    expect(html).toContain('href="checkout/storylines/map.html"');
+    expect(html).toContain('href="fulfillment/storylines/map.html"');
+  });
+
+  it("shows the slice's storyline on its page, linked to the canvas", async () => {
+    const html = await readFile(join(outDir, "fulfillment", "slices", "receive-order.html"), "utf8");
+    expect(html).toContain('<a href="../storylines/map.html">Fulfil an order</a>');
+  });
+
+  it("retargets em's slice-doc links in every rendered artifact to the portal's slice pages", async () => {
+    // em bakes hrefs to `slices/<key>.md` (relative to the SOURCE tree) into
+    // every SVG; the portal rewrites known slice keys to its own pages.
+    const diagram = await readFile(join(outDir, "order-fulfillment", "diagram.svg"), "utf8");
+    expect(diagram).toContain('href="slices/checkout.html"');
+    expect(diagram).not.toMatch(/href="[^"]*slices\/checkout\.md"/);
+    const sliceSvg = await readFile(join(outDir, "order-fulfillment", "slices", "checkout.svg"), "utf8");
+    expect(sliceSvg).toContain('href="checkout.html"');
+  });
+});
+
 describe("buildPortal — guided first read (MIL-174)", () => {
   let outDir: string;
 
