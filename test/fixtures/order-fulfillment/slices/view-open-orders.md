@@ -43,21 +43,24 @@ command-and-event sense.
   - This view is never repeated (`view … again`) elsewhere in the model, so there's only one
     instance to keep in sync.
 
-## Scenarios (Given / When / Then)
+## Scenarios
 
-- **Happy path**
-  - **Given:** `Order Placed` has been recorded for a customer's order
-  - **When:** that customer opens **Order List**
-  - **Then:** the order appears with its `orderId` and `total`.
-- **Not yet projected**
-  - **Given:** `Order Placed` was just recorded and the projection hasn't caught up yet
-  - **When:** the customer opens **Order List** immediately after checkout
-  - **Then:** the order may briefly be missing (eventual consistency) — the UI should not
-    treat this as an error state.
+### Scenario: Happy path
+
+- **Given:** `Order Placed` has been recorded for a customer's order
+- **When:** that customer opens **Order List**
+- **Then:** the order appears with its `orderId` and `total`.
+
+### Scenario: Not yet projected
+
+- **Given:** `Order Placed` was just recorded and the projection hasn't caught up yet
+- **When:** the customer opens **Order List** immediately after checkout
+- **Then:** the order may briefly be missing (eventual consistency) — the UI should not treat this as an error state.
 
 ## Dependencies & Read Models Affected
 
-- **Upstream events this slice relies on:** `Order Placed` (**Browse Catalog**).
+- **Upstream events this slice relies on:** `Order Placed` (**Browse Catalog** — its `total`
+  is already guarded upstream by INV-BC-1, so this view never re-validates it).
 - **Downstream read models / slices affected:** none directly — this is a leaf read model
   for the customer-facing order list. (Payment status changes flow through their own slices —
   **Manager Review**, **Show Receipt** — rather than back through this view.)

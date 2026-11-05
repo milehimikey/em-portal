@@ -235,8 +235,10 @@ ${linkRows}
     ? `    <p><a class="first-read-cta" href="${firstReadHref}">First read: new here? Learn the notation on ${escapeHtml(summary.models[0].name)} &rarr;</a></p>`
     : "";
 
+  const narrative = summary.narrativeHtml ? `    <div class="doc narrative">${summary.narrativeHtml}</div>\n` : "";
+
   const body = `${firstReadBanner}
-${renderStatusSection(status)}
+${narrative}${renderStatusSection(status)}
 ${systemMapSection(summary)}
     <h2>Models</h2>
     <table>

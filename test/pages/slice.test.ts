@@ -82,6 +82,10 @@ function render(doc: SliceDocJoin): string {
     doc,
     docBodyHtml: "<p>body</p>",
     hasCanvas: false,
+    fields: [],
+    invariants: [],
+    openQuestions: [],
+    invariantCatalog: [],
   });
 }
 

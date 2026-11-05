@@ -8,7 +8,7 @@
 // real em binary rather than hand-built fixtures.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -186,6 +186,94 @@ describe("buildPortal — storyline canvas and system map (GH #4)", () => {
     expect(diagram).not.toMatch(/href="[^"]*slices\/checkout\.md"/);
     const sliceSvg = await readFile(join(outDir, "order-fulfillment", "slices", "checkout.svg"), "utf8");
     expect(sliceSvg).toContain('href="checkout.html"');
+  });
+});
+
+describe("buildPortal — component layer + MDX content (GH #3 item 2)", () => {
+  let outDir: string;
+  const CONTENT = join(FIXTURES, "multi-model", "content");
+
+  beforeAll(async () => {
+    outDir = await mkdtemp(join(tmpdir(), "em-portal-components-test-"));
+    await buildPortal([CHECKOUT, FULFILLMENT, ORDER_FULFILLMENT], {
+      outDir,
+      title: "Component Test Portal",
+      content: CONTENT,
+    });
+  });
+
+  afterAll(async () => {
+    await rm(outDir, { recursive: true, force: true });
+  });
+
+  it("renders slice doc bodies through em's section-aware renderer (scenario cards, field tables)", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "view-open-orders.html"), "utf8");
+    expect(html).toContain('class="scenario-card"');
+    expect(html).toContain("scenario-step--given");
+    expect(html).toContain('class="field-table"');
+  });
+
+  it("upgrades em's external INV chips into cross-slice links via the invariant catalog", async () => {
+    // view-open-orders.md cites INV-BC-1, which browse-catalog owns — em
+    // renders that as an unlinked external chip; the portal links it to the
+    // owning slice's page, landing on em's own definition anchor.
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "view-open-orders.html"), "utf8");
+    expect(html).toContain('href="browse-catalog.html#inv-inv-bc-1"');
+  });
+
+  it("gives every slice page an Invariants row with its own declared ids", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "view-open-orders.html"), "utf8");
+    expect(html).toContain("Invariants");
+    expect(html).toContain("INV-VOO-1");
+  });
+
+  it("surfaces open questions as a stat from the structured export", async () => {
+    const html = await readFile(join(outDir, "order-fulfillment", "slices", "view-open-orders.html"), "utf8");
+    expect(html).toContain("Open questions");
+    expect(html).toContain("1 open");
+  });
+
+  it("renders the model page's invariant catalog with rule text and owning-slice links", async () => {
+    const html = await readFile(join(outDir, "fulfillment", "index.html"), "utf8");
+    expect(html).toContain("INV-FUL-1");
+    expect(html).toContain("accepted at most once");
+    expect(html).toContain('href="slices/receive-order.html"');
+  });
+
+  it("renders a Contract section from structured fields on a doc-less slice", async () => {
+    // fixtures/multi-model has no slices/*.md at all, so receive-order's
+    // field tables can only come from --doc-json's model-derived data.
+    const html = await readFile(join(outDir, "fulfillment", "slices", "receive-order.html"), "utf8");
+    expect(html).toContain("Contract");
+    expect(html).toContain('class="field-table"');
+    expect(html).toContain("orderId");
+  });
+
+  it("compiles index.mdx into the landing narrative, with the portal component set", async () => {
+    const html = await readFile(join(outDir, "index.html"), "utf8");
+    expect(html).toContain("Welcome to the example system");
+    expect(html).toContain('class="badge ok"');
+    expect(html).toContain('class="inv-chip"');
+  });
+
+  it("compiles <model-key>.mdx into that model page's intro", async () => {
+    const html = await readFile(join(outDir, "checkout", "index.html"), "utf8");
+    expect(html).toContain("owns the buying journey");
+    const other = await readFile(join(outDir, "fulfillment", "index.html"), "utf8");
+    expect(other).not.toContain("owns the buying journey");
+  });
+
+  it("warns about a content file matching no model key instead of silently skipping it", async () => {
+    const tmpContent = await mkdtemp(join(tmpdir(), "em-portal-content-typo-"));
+    const tmpOut = await mkdtemp(join(tmpdir(), "em-portal-content-typo-out-"));
+    try {
+      await writeFile(join(tmpContent, "chekout.mdx"), "typo'd model key\n", "utf8");
+      const result = await buildPortal([ORDER_FULFILLMENT], { outDir: tmpOut, content: tmpContent });
+      expect(result.warnings.some((w) => w.includes("chekout.mdx"))).toBe(true);
+    } finally {
+      await rm(tmpContent, { recursive: true, force: true });
+      await rm(tmpOut, { recursive: true, force: true });
+    }
   });
 });
 

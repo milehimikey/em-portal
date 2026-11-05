@@ -38,4 +38,7 @@ export interface PortalSummary {
   /** `em system --json`'s contextMap, when a `system.yaml` was found (or
    *  given) — null means the landing page has no system map section. */
   systemMap: SystemDoc["contextMap"] | null;
+  /** Rendered `--content` `index.mdx` (hand-authored landing narrative,
+   *  GH #3 item 2) — null when no content dir or no index.mdx. */
+  narrativeHtml: string | null;
 }

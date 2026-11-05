@@ -23,7 +23,11 @@ program
     "--system <manifest>",
     "system.yaml manifest for the landing page's system map (default: the nearest system.yaml above the first model file)",
   )
-  .action(async (models: string[], options: { out: string; title: string; tests?: string; repo?: string; system?: string }) => {
+  .option(
+    "--content <dir>",
+    "directory of hand-authored .mdx content, compiled to static HTML at build time: index.mdx = landing narrative, <model-key>.mdx = that model's intro (MDX is site-layer only; slice docs stay plain markdown)",
+  )
+  .action(async (models: string[], options: { out: string; title: string; tests?: string; repo?: string; system?: string; content?: string }) => {
     try {
       const result = await buildPortal(models, {
         outDir: options.out,
@@ -31,6 +35,7 @@ program
         testsDir: options.tests,
         repo: options.repo,
         system: options.system,
+        content: options.content,
       });
       for (const w of result.warnings) console.warn(`warning: ${w}`);
       console.log(

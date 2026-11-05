@@ -56,6 +56,25 @@ const STYLE = `
   code { background: #eee; padding: .05rem .3rem; border-radius: 3px; }
   footer { max-width: 1000px; margin: 0 auto; padding: 0 1.25rem 2rem; font-size: 12px; color: #7b8794; }
   .first-read-cta { display: inline-block; margin: .5rem 0 1rem; padding: .5rem 1rem; border-radius: 6px; background: #1f2933; color: #fff; text-decoration: none; font-weight: 600; }
+  /* em's section-aware doc render (GH #402: .scenario-card/.inv-chip/.field-table
+     markup comes from em itself, --doc-json --include-html) + the portal's own
+     component sections (components.ts). Styled here; never re-generated here. */
+  .scenario-card { border: 1px solid #ddd; border-left: 4px solid #1f2933; border-radius: 6px; background: #fff; padding: .75rem 1rem; margin: 1rem 0; }
+  .scenario-card-title { margin: 0 0 .5rem; font-size: 1rem; }
+  .scenario-step { display: flex; gap: .6rem; margin: .25rem 0; }
+  .scenario-step-label { flex: 0 0 3.2rem; font-weight: 700; font-size: 12px; text-transform: uppercase; color: #52606d; padding-top: .15rem; }
+  .scenario-step--given .scenario-step-label { color: #10633c; }
+  .scenario-step--when .scenario-step-label { color: #8a5a00; }
+  .scenario-step--then .scenario-step-label { color: #2b6cb0; }
+  .scenario-step-body > p:first-child { margin-top: 0; }
+  .scenario-step-body > p:last-child { margin-bottom: 0; }
+  .inv-chip { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #e0ecff; color: #1d4e89; text-decoration: none; }
+  a.inv-chip:hover { text-decoration: underline; }
+  .inv-chip--external { background: #eee; color: #52606d; }
+  .invariant-list { list-style: none; padding-left: 0; }
+  .invariant-list li { margin: .35rem 0; }
+  table.field-table .col-type { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  table.field-table .col-notes, table.field-table .col-flag { color: #52606d; font-size: 13px; }
 `;
 
 export interface Crumb {

@@ -23,11 +23,13 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { emExportJson, emRenderModel, emRenderSlice, emRenderStorylineMap, emStatusJson, emSystemJson } from "./em/run.js";
+import { emExportDocJson, emExportJson, emRenderModel, emRenderSlice, emRenderStorylineMap, emStatusJson, emSystemJson } from "./em/run.js";
 import { checkExportSchemaCompatible, ExportDoc } from "./em/exportDoc.js";
-import { renderDocBody } from "./em/docBody.js";
+import { checkDocJsonSchemaCompatible, DocJsonExportDoc, DocJsonSlice } from "./em/docJsonDoc.js";
 import { checkStatusSchemaCompatible, StatusDoc } from "./em/statusDoc.js";
 import { checkSystemSchemaCompatible, SystemDoc } from "./em/systemDoc.js";
+import { linkExternalInvChips, rewriteSiblingDocLinks } from "./pages/components.js";
+import { listMdxFiles, renderMdxFile } from "./content.js";
 import { buildCrossModelLinks, CompiledModel } from "./crossModel.js";
 import { dedupe, kebabSlug } from "./slug.js";
 import { renderIndexPage } from "./pages/index.js";
@@ -48,6 +50,11 @@ export interface BuildOptions {
    *  first directory holding `.git` — or the filesystem root); when none is
    *  found, the landing page simply has no system map. */
   system?: string;
+  /** Directory of hand-authored `.mdx` content (GH #3 item 2 — MDX is
+   *  site-layer only, never slice docs): `index.mdx` is the landing
+   *  narrative, `<model-key>.mdx` a model page's intro. Compiled to static
+   *  HTML at build time (src/content.ts). */
+  content?: string;
 }
 
 export interface BuildTiming {
@@ -115,6 +122,18 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
   await mkdir(outDir, { recursive: true });
 
   const warnings: string[] = [];
+  // Hand-authored MDX content (GH #3 item 2): compiled to static HTML up
+  // front for index.mdx, per model inside the loop. `consumedContent`
+  // tracks which files a page actually used so a leftover (typo'd model
+  // key) warns instead of silently not appearing.
+  const contentDir = opts.content ?? null;
+  const consumedContent = new Set<string>();
+  let landingNarrativeHtml: string | null = null;
+  if (contentDir && existsSync(join(contentDir, "index.mdx"))) {
+    landingNarrativeHtml = await renderMdxFile(join(contentDir, "index.mdx"));
+    consumedContent.add("index.mdx");
+  }
+
   const usedModelKeys = new Set<string>();
   const compiled: CompiledModel[] = [];
   const modelSummaries: ModelSummary[] = [];
@@ -129,6 +148,13 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
     for (const d of doc.diagnostics) {
       if (d.severity === "warning") warnings.push(`${file}:${d.line ?? "?"}: ${d.message}`);
     }
+    // GH #3 item 2: the structured slice-doc export drives the component
+    // layer, and its `--include-html` body (em's section-aware render,
+    // GH #402) replaced the portal's own markdown re-parse of slices/*.md.
+    const docJson = (await emExportDocJson(file)) as DocJsonExportDoc;
+    const docJsonWarning = checkDocJsonSchemaCompatible(docJson);
+    if (docJsonWarning) warnings.push(`${file}: ${docJsonWarning}`);
+    const docJsonByKey = new Map<string, DocJsonSlice>(docJson.model.slices.map((s) => [s.key, s]));
     const tExportEnd = performance.now();
 
     const modelKey = dedupe(kebabSlug(doc.model.name ?? basename(file, extname(file))), usedModelKeys);
@@ -163,6 +189,12 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
       await emRenderSlice(file, slice.name, join(slicesDir, sliceDiagramFile));
       await retargetFile(join(slicesDir, sliceDiagramFile), sliceKeys, "");
 
+      const docJsonSlice = docJsonByKey.get(slice.key);
+      const rawBodyHtml = docJsonSlice?.html ?? null;
+      const docBodyHtml = rawBodyHtml
+        ? linkExternalInvChips(rewriteSiblingDocLinks(rawBodyHtml), docJson.model.invariants, slice.key)
+        : null;
+
       const page = renderSlicePage({
         modelName: doc.model.name ?? modelKey,
         modelKey,
@@ -171,8 +203,12 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
         slice,
         pattern: slice.pattern,
         doc: slice.doc,
-        docBodyHtml: renderDocBody(file, slice.doc.path),
+        docBodyHtml,
         hasCanvas,
+        fields: docJsonSlice?.fields ?? [],
+        invariants: docJsonSlice?.invariants ?? [],
+        openQuestions: docJsonSlice?.openQuestions ?? [],
+        invariantCatalog: docJson.model.invariants,
       });
       await writeFile(join(slicesDir, `${slice.key}.html`), page, "utf8");
 
@@ -188,6 +224,15 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
     }
     const tRenderEnd = performance.now();
 
+    let introHtml: string | null = null;
+    if (contentDir) {
+      const introFile = `${modelKey}.mdx`;
+      if (existsSync(join(contentDir, introFile))) {
+        introHtml = await renderMdxFile(join(contentDir, introFile));
+        consumedContent.add(introFile);
+      }
+    }
+
     const modelPage = renderModelPage({
       modelKey,
       modelName: doc.model.name ?? modelKey,
@@ -196,6 +241,9 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
       slices: sliceSummaries,
       storylines: doc.model.storylines,
       storylineEdges: doc.model.storylineEdges,
+      invariantCatalog: docJson.model.invariants,
+      docJsonSlices: docJson.model.slices,
+      introHtml,
     });
     await writeFile(join(modelDir, "index.html"), modelPage, "utf8");
 
@@ -261,11 +309,20 @@ export async function buildPortal(files: string[], opts: BuildOptions): Promise<
     }
   }
 
+  if (contentDir) {
+    for (const f of await listMdxFiles(contentDir)) {
+      if (!consumedContent.has(f)) {
+        warnings.push(`--content: ${f} matches no model key in this build (built: ${modelSummaries.map((m) => m.key).join(", ")}) — expected index.mdx or <model-key>.mdx`);
+      }
+    }
+  }
+
   const summary: PortalSummary = {
     title: opts.title ?? "em portal",
     models: modelSummaries,
     crossModelLinks,
     systemMap,
+    narrativeHtml: landingNarrativeHtml,
   };
   const indexHtml = renderIndexPage(statusDoc, summary);
   await writeFile(join(outDir, "index.html"), indexHtml, "utf8");

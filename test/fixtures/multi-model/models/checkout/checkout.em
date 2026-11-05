@@ -15,6 +15,7 @@ storyline "Buy something" {
     command Submit Order public {
       total: decimal
     }
+    invariant INV-CHK-1 "An order is submitted with a positive total"
     event Order Submitted @Order public {
       orderId: uuid assigned
       total: decimal

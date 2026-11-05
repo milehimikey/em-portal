@@ -61,7 +61,29 @@ Options:
   --system <manifest> system.yaml for the landing page's system map (default: the
                        nearest system.yaml above the first model file, the same
                        walk-up `em status` uses; none found = no system map)
+  --content <dir>     directory of hand-authored .mdx content, compiled to static
+                       HTML at build time: index.mdx = landing narrative,
+                       <model-key>.mdx = that model's intro
 ```
+
+### Hand-authored content (MDX — site-layer only)
+
+MDX lives in the **site layer, never in slice docs** (em#396's constraint: slice `.md` docs
+stay canonical plain markdown). `--content <dir>` names a directory of `.mdx` files —
+`index.mdx` renders above the landing page's status rollup, `<model-key>.mdx` under that
+model page's title. Files are compiled at build time (`@mdx-js/mdx` → preact
+render-to-string) into the same self-contained static HTML as every other page: no client
+runtime, no hydration. MDX content gets a small component set matching the portal's own
+styling: `<Badge kind="ok|warn|bad">…</Badge>` and `<InvChip id="…" href="…" />`.
+
+**Why not Starlight?** em#396 named the `toolshed-v2` Starlight example as a candidate base.
+Evaluated and declined, recorded here: Astro/Starlight output assumes a served base
+(absolute asset paths, client JS), which breaks this portal's two hard constraints —
+`file://` browsing and fully self-contained pages (mil-162) — and its content-collection
+architecture centers the site on authored docs, where this portal is a pure function of
+`em export`/`em status` data with authored content as garnish. So MDX joins the bespoke
+generator as a build-time compile step instead of the generator moving into a framework.
+The output remains fully static either way, which is the part em#396 fixed.
 
 Multiple models in one invocation is how a multi-model system's cross-model index and
 `em status` rollup get built — same "one directory per model" convention
@@ -87,11 +109,17 @@ project, resolved the normal npm way):
   behind HEAD, unruled conformance findings).
 - `em render <file>` / `em render <file> --slice <name>` — the model's full diagram and each
   slice's own canonical-pattern diagram (SVG).
+- `em export <file> --doc-json --include-html` (em#401, doc schema 1.0) — the structured
+  slice-doc export the component layer is driven by: per slice the parsed sections AS DATA
+  (field tables, invariants, scenarios, error flows, open questions) plus em's own
+  section-aware HTML render of the doc body (em#402: scenario cards, INV chips, field-table
+  classes), and a model-level invariant catalog (id → owning slice → citing slices).
 
-`em export`'s doc join is deliberately frontmatter-only ("never the markdown body" — see the em
-repo's `docs/cli.md`); em-portal reads the bound `slices/<key>.md` file itself (the same
-`doc.path` the join already names) and renders its body with `marked`, the same markdown engine
-`em catalog` uses.
+em-portal never re-reads or re-parses `slices/*.md` itself: the doc body HTML comes from
+`--include-html` (one markdown engine — em's), and every structured section comes from the
+doc-json data. The portal styles em's markup and exceeds it with what a single-doc render
+can't know — the invariant catalog's cross-slice links (an `INV-*` chip for a rule another
+slice owns links to that slice's page, landing on em's own definition anchor).
 
 **Consumers must tolerate unknown fields.** em's own versioning policy is additive-minor-bump,
 breaking-major-bump; `src/em/exportDoc.ts`/`statusDoc.ts` declare only the fields em-portal

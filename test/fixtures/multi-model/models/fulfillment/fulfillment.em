@@ -18,6 +18,7 @@ storyline "Fulfil an order" {
       orderId: uuid
       total: decimal
     }
+    invariant INV-FUL-1 "An order is accepted at most once per checkout order id"
     event Order Accepted @Order {
       orderId: uuid
       total: decimal
